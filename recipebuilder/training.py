@@ -77,8 +77,8 @@ class CocktailTrainingSample:
 
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "CocktailTrainingSample":
-        if "name" not in data or "success_score" not in data:
-            raise ValueError("Training samples require 'name' and 'success_score'.")
+        if "name" not in data:
+            raise ValueError("Training samples require a 'name'.")
         raw_ingredients = data.get("ingredients")
         if not isinstance(raw_ingredients, Sequence):
             raise ValueError("Training samples require an 'ingredients' list.")
@@ -90,9 +90,15 @@ class CocktailTrainingSample:
         if not ingredients:
             raise ValueError("Training samples must include at least one valid ingredient entry.")
         tags = data.get("tags")
+        success_score = data.get("success_score", 4.5)
+        try:
+            score_value = float(success_score)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Training samples require a numeric 'success_score' if provided.") from exc
+
         return cls(
             name=str(data["name"]),
-            success_score=float(data["success_score"]),
+            success_score=score_value,
             ingredients=ingredients,
             tags=_ensure_list(tags),
             max_score=float(data.get("max_score", 5.0)),
