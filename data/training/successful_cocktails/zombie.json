@@ -1,0 +1,12 @@
+{
+  "name": "Zombie",
+  "success_score": 4.6,
+  "max_score": 5,
+  "tags": ["tropical", "rum", "strong"],
+  "metadata": {"glassware": "skull glass", "ice": "crushed"},
+  "ingredients": [
+    {"name": "Dark Rum", "role": "base", "amount_ml": 25, "flavour_tags": ["dark rum", "rich", "molasses"]},
+    {"name": "Light Rum", "role": "modifier", "amount_ml": 25, "flavour_tags": ["rum", "light", "clean"]},
+    {"name": "Spiced Rum", "role": "modifier", "amount_ml": 25, "flavour_tags": ["spice", "rum", "warm"]}
+  ]
+}

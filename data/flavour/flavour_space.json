@@ -1,0 +1,23 @@
+{
+  "flavour_axes": {
+    "taste": ["sweet", "sour", "bitter", "salt", "umami"],
+    "aroma": [
+      "citrus",
+      "floral",
+      "herbal",
+      "spice",
+      "woody",
+      "smoky",
+      "nutty",
+      "berry",
+      "tropical",
+      "stone-fruit",
+      "vanilla",
+      "caramel",
+      "coffee",
+      "chocolate"
+    ],
+    "structure": ["strength_abv", "body", "sparkle", "temperature"],
+    "affect": ["refreshing", "indulgent", "elegant", "bold"]
+  }
+}
