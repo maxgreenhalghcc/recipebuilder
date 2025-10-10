@@ -8,6 +8,7 @@ from itertools import combinations
 from statistics import mean
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
+import re
 
 from recipebuilder.preferences import build_preference_plan, collect_profile_tags
 
@@ -613,26 +614,83 @@ def _normalize_identifier(value: str) -> str:
     return token.replace("__", "_")
 
 
+_NEGATIVE_NOTE_PATTERN = re.compile(
+    r"(?:no|avoid|without|allergic to|allergy to|can't have|cannot have|intolerant to|sensitive to)\s+([a-z0-9 ,/&-]+)"
+)
+
+_LISTED_ALLERGEN_PATTERN = re.compile(r"allerg(?:y|ies)\s*[:\-]\s*([a-z0-9 ,/&-]+)")
+
+_FREE_PATTERN = re.compile(r"([a-z0-9]+)-free")
+
+_AVOID_SYNONYMS: Dict[str, Set[str]] = {
+    "nuts": {"nut", "nuts", "nutty", "amaretto", "hazelnut", "almond", "orgeat", "praline", "pecan", "walnut"},
+    "dairy": {"dairy", "milk", "cream", "creme", "cream", "baileys", "yogurt", "yoghurt"},
+    "egg": {"egg", "albumen", "eggwhite", "egg-white"},
+    "coconut": {"coconut", "malibu"},
+    "pineapple": {"pineapple", "pineapple juice"},
+    "passion fruit": {"passion fruit", "passionfruit", "passion-fruit", "passion"},
+    "orange": {"orange", "orange juice", "clementine", "mandarin"},
+    "cranberry": {"cranberry", "cranberry juice"},
+    "citrus": {"citrus", "lemon", "lime", "grapefruit"},
+    "gluten": {"gluten", "wheat", "barley", "beer"},
+    "ginger": {"ginger", "ginger beer"},
+    "sugar": {"sugar", "syrup", "simple syrup"},
+    "spice": {"spice", "spices", "spiced", "cinnamon", "nutmeg"},
+}
+
+
+def _expand_avoid_terms(raw_terms: Iterable[str]) -> List[str]:
+    expanded: Set[str] = set()
+    for term in raw_terms:
+        key = _normalize(term)
+        if not key:
+            continue
+        expanded.add(key)
+        for canonical, synonyms in _AVOID_SYNONYMS.items():
+            normalized_canonical = _normalize(canonical)
+            normalized_synonyms = {_normalize(value) for value in synonyms}
+            if key == normalized_canonical or key in normalized_synonyms:
+                expanded.add(normalized_canonical)
+                expanded.update(normalized_synonyms)
+    return sorted(expanded)
+
+
 def _extract_avoid_terms(notes: Optional[str]) -> List[str]:
     if not notes:
         return []
+
     lower = notes.lower()
-    terms: List[str] = []
-    if "no coconut" in lower:
-        terms.append("coconut")
-    if "no dairy" in lower:
-        terms.extend(["cream", "milk", "dairy"])
-    if "no egg" in lower:
-        terms.extend(["egg", "albumen"])
-    if "no sugar" in lower:
-        terms.extend(["sugar", "syrup"])
-    if "no spice" in lower:
-        terms.append("spice")
-    if "no citrus" in lower:
-        terms.append("citrus")
-    if "allergic to nuts" in lower or "no nuts" in lower:
-        terms.extend(["nut", "amaretto", "frangelico", "hazelnut"])
-    return list(dict.fromkeys(terms))
+    extracted: List[str] = []
+
+    for pattern in (_NEGATIVE_NOTE_PATTERN, _LISTED_ALLERGEN_PATTERN):
+        for match in pattern.finditer(lower):
+            raw = match.group(1)
+            raw = raw.split(".")[0]
+            for part in re.split(r"[,&/]| and ", raw):
+                token = part.strip()
+                if not token:
+                    continue
+                extracted.append(token)
+
+    for match in _FREE_PATTERN.finditer(lower):
+        extracted.append(match.group(1))
+
+    if "allergic to" in lower and "and" in lower:
+        for segment in lower.split("allergic to"):
+            for part in re.split(r"[,&/]| and ", segment):
+                token = part.strip()
+                if token:
+                    extracted.append(token)
+
+    if "no" in lower:
+        for part in re.split(r"no ", lower):
+            if not part:
+                continue
+            candidate = part.split()[0]
+            if candidate:
+                extracted.append(candidate)
+
+    return _expand_avoid_terms(extracted)
 
 
 def _should_exclude(ingredient: Ingredient, avoid_terms: Sequence[str]) -> bool:
@@ -647,6 +705,54 @@ def _should_exclude(ingredient: Ingredient, avoid_terms: Sequence[str]) -> bool:
         if key in name_tokens or any(key in tag for tag in tag_tokens):
             return True
     return False
+
+
+_BASE_JUICE_KEYWORDS: Set[str] = {
+    "pineapple",
+    "pineapple juice",
+    "passion fruit",
+    "passionfruit",
+    "orange",
+    "orange juice",
+    "cranberry",
+    "cranberry juice",
+}
+
+_SECONDARY_JUICE_KEYWORDS: Set[str] = {"lemonade", "citrus blend", "tropical juice"}
+
+_TART_JUICE_KEYWORDS: Set[str] = {
+    "cranberry",
+    "cranberry juice",
+    "passion",
+    "citrus",
+    "lime",
+    "lemon",
+    "grapefruit",
+}
+
+
+def _ingredient_matches_keywords(ingredient: Ingredient, keywords: Sequence[str]) -> bool:
+    if not keywords:
+        return False
+    normalized_keywords = {_normalize(keyword) for keyword in keywords if keyword}
+    if not normalized_keywords:
+        return False
+    name_normalized = _normalize(ingredient.name)
+    condensed_name = name_normalized.replace(" ", "")
+    tokens = set(_tokenize(ingredient.name))
+    tokens.update(_normalize(tag) for tag in ingredient.flavour_tags)
+    condensed_tokens = {token.replace(" ", "") for token in tokens}
+    for keyword in normalized_keywords:
+        condensed_keyword = keyword.replace(" ", "")
+        if keyword in tokens or condensed_keyword in condensed_tokens:
+            return True
+        if keyword and (keyword in name_normalized or condensed_keyword in condensed_name):
+            return True
+    return False
+
+
+def _is_tart_juice(ingredient: Ingredient) -> bool:
+    return _ingredient_matches_keywords(ingredient, _TART_JUICE_KEYWORDS)
 
 
 def _match_named_ingredient(
@@ -754,6 +860,65 @@ def _select_best_match(
         keyword_hints=keyword_hints,
     )
     return ranked[0][0] if ranked else None
+
+
+def _select_juice_candidate(
+    juices: Sequence[Ingredient],
+    profile: Dict[str, float],
+    *,
+    association_model: Optional[FlavourAssociationModel],
+    existing_tags: Optional[Sequence[str]],
+    used_names: Set[str],
+    keyword_hints: Optional[Sequence[str]] = None,
+    required_keywords: Optional[Sequence[str]] = None,
+) -> Optional[Ingredient]:
+    candidates: List[Ingredient] = []
+    normalized_used = {_normalize(name) for name in used_names}
+    for ingredient in juices:
+        if _normalize(ingredient.name) in normalized_used:
+            continue
+        if required_keywords and not _ingredient_matches_keywords(ingredient, required_keywords):
+            continue
+        candidates.append(ingredient)
+    if not candidates:
+        return None
+    ranked = _rank_ingredients(
+        candidates,
+        profile,
+        association_model=association_model,
+        existing_tags=existing_tags,
+        role="juice",
+        keyword_hints=keyword_hints,
+    )
+    return ranked[0][0] if ranked else None
+
+
+def _select_lengthener_candidate(
+    juices: Sequence[Ingredient],
+    profile: Dict[str, float],
+    *,
+    association_model: Optional[FlavourAssociationModel],
+    existing_tags: Optional[Sequence[str]],
+    used_names: Set[str],
+    keyword_hints: Optional[Sequence[str]] = None,
+) -> Optional[Ingredient]:
+    for keyword_pool in (
+        list(_BASE_JUICE_KEYWORDS),
+        list(_SECONDARY_JUICE_KEYWORDS),
+        None,
+    ):
+        candidate = _select_juice_candidate(
+            juices,
+            profile,
+            association_model=association_model,
+            existing_tags=existing_tags,
+            used_names=used_names,
+            keyword_hints=keyword_hints,
+            required_keywords=keyword_pool,
+        )
+        if candidate:
+            return candidate
+    return None
 
 
 def _match_base_spirit(
@@ -864,6 +1029,75 @@ def _select_garnish(
     return ranked[0][0] if ranked else None
 
 
+def _ensure_palate_balance(
+    suggestions: Sequence[IngredientSuggestion],
+    plan,
+) -> None:
+    if not suggestions:
+        return
+
+    role_groups: Dict[str, List[IngredientSuggestion]] = defaultdict(list)
+    for suggestion in suggestions:
+        role = suggestion.role.strip().lower()
+        role_groups[role].append(suggestion)
+
+    def _total(role: str) -> float:
+        return sum(max(s.amount_ml, 0.0) for s in role_groups.get(role, []))
+
+    base_total = _total("base")
+    if role_groups.get("base"):
+        base_target_min = 35.0
+        base_target_max = 60.0
+        primary_base = role_groups["base"][0]
+        if base_total < base_target_min:
+            primary_base.amount_ml += base_target_min - base_total
+            base_total = _total("base")
+        elif base_total > base_target_max:
+            scale = base_target_max / base_total if base_total > 0 else 1.0
+            for suggestion in role_groups["base"]:
+                suggestion.amount_ml = max(5.0, suggestion.amount_ml * scale)
+            base_total = _total("base")
+
+    juice_total = _total("juice")
+    if role_groups.get("juice"):
+        min_juice = max(base_total * 0.85, 40.0)
+        try:
+            glass_min = float(getattr(plan, "glass_min_ml", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            glass_min = 0.0
+        if glass_min:
+            min_juice = max(min_juice, glass_min * 0.35)
+        if juice_total < min_juice:
+            deficit = min_juice - juice_total
+            share = deficit / len(role_groups["juice"])
+            for suggestion in role_groups["juice"]:
+                suggestion.amount_ml += share
+            juice_total = _total("juice")
+
+    sweet_total = _total("sweetener")
+    if role_groups.get("sweetener") and juice_total > 0:
+        min_sweet = max(juice_total * 0.12, 5.0)
+        max_sweet = max(juice_total * 0.6, min_sweet)
+        if sweet_total < min_sweet:
+            deficit = min_sweet - sweet_total
+            share = deficit / len(role_groups["sweetener"])
+            for suggestion in role_groups["sweetener"]:
+                suggestion.amount_ml += share
+            sweet_total = _total("sweetener")
+        elif sweet_total > max_sweet and sweet_total > 0:
+            scale = max_sweet / sweet_total
+            for suggestion in role_groups["sweetener"]:
+                suggestion.amount_ml = max(3.0, suggestion.amount_ml * scale)
+
+    modifier_total = _total("modifier")
+    if role_groups.get("modifier") and base_total > 0:
+        max_modifier = max(base_total * 0.6, 15.0)
+        if modifier_total > max_modifier and modifier_total > 0:
+            scale = max_modifier / modifier_total
+            for suggestion in role_groups["modifier"]:
+                suggestion.amount_ml = max(5.0, suggestion.amount_ml * scale)
+
+
 def generate_cocktail_recipe(
     responses: Dict[str, Optional[str]],
     *,
@@ -952,29 +1186,95 @@ def generate_cocktail_recipe(
         keyword_hints=plan.sweetener_tags,
     )
 
+    sweetener_added = False
     if plan.sweetener_ml > 0 and sweet_ranked:
         sweetener, _ = sweet_ranked[0]
         suggestions.append(IngredientSuggestion(sweetener, plan.sweetener_ml, "sweetener"))
+        sweetener_added = True
         existing_tags = _collect_tags(suggestions)
 
-    juice_hints: List[str] = list(plan.juice_tags)
+    juice_hints: List[str] = [hint for hint in list(plan.juice_tags) if hint]
     if plan.juice_focus:
         juice_hints.append(plan.juice_focus)
 
-    juices_ranked = _rank_ingredients(
+    if not juices_pool:
+        raise ValueError("Bar stock does not include suitable juices for this serve.")
+
+    used_juice_names: Set[str] = set()
+
+    primary_juice = _select_juice_candidate(
         juices_pool,
         profile,
         association_model=association_model,
         existing_tags=existing_tags,
-        role="juice",
+        used_names=used_juice_names,
         keyword_hints=juice_hints,
+        required_keywords=list(_BASE_JUICE_KEYWORDS),
     )
 
-    wants_juice = bool(juice_hints)
-    if wants_juice and juices_ranked:
-        juice, _ = juices_ranked[0]
-        juice_amount = _default_amount(juice.category, juice, "juice")
-        suggestions.append(IngredientSuggestion(juice, juice_amount, "juice"))
+    if primary_juice is None:
+        raise ValueError(
+            "Bar stock must include pineapple, passion fruit, orange, or cranberry juice for this serve."
+        )
+
+    used_juice_names.add(_normalize(primary_juice.name))
+    base_reference_ml = plan.base_ml if plan.base_ml > 0 else _default_amount(base.category, base, "base")
+    primary_amount = max(
+        _default_amount(primary_juice.category, primary_juice, "juice"),
+        base_reference_ml * 0.8,
+    )
+    primary_amount = min(primary_amount, 90.0)
+    suggestions.append(IngredientSuggestion(primary_juice, primary_amount, "juice"))
+    primary_juice_name = primary_juice.name
+    juice_hints.append(primary_juice.name)
+    existing_tags = _collect_tags(suggestions)
+
+    if not sweetener_added and _is_tart_juice(primary_juice) and sweet_ranked:
+        fallback_sweetener, _ = sweet_ranked[0]
+        fallback_amount = 12.0
+        suggestions.append(IngredientSuggestion(fallback_sweetener, fallback_amount, "sweetener"))
+        sweetener_added = True
+        existing_tags = _collect_tags(suggestions)
+
+    secondary_focus = plan.juice_focus or ""
+    if secondary_focus and not _ingredient_matches_keywords(primary_juice, [secondary_focus]):
+        focus_candidate = _select_juice_candidate(
+            juices_pool,
+            profile,
+            association_model=association_model,
+            existing_tags=existing_tags,
+            used_names=used_juice_names,
+            keyword_hints=juice_hints,
+            required_keywords=[secondary_focus],
+        )
+        if focus_candidate:
+            used_juice_names.add(_normalize(focus_candidate.name))
+            focus_amount = min(max(base_reference_ml * 0.5, 25.0), 60.0)
+            suggestions.append(IngredientSuggestion(focus_candidate, focus_amount, "juice"))
+            juice_hints.append(focus_candidate.name)
+            existing_tags = _collect_tags(suggestions)
+
+    try:
+        glass_min = float(getattr(plan, "glass_min_ml", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        glass_min = 0.0
+
+    if glass_min and glass_min >= 240:
+        additional_candidate = _select_juice_candidate(
+            juices_pool,
+            profile,
+            association_model=association_model,
+            existing_tags=existing_tags,
+            used_names=used_juice_names,
+            keyword_hints=juice_hints,
+            required_keywords=list(_BASE_JUICE_KEYWORDS),
+        )
+        if additional_candidate:
+            used_juice_names.add(_normalize(additional_candidate.name))
+            additional_amount = min(max(glass_min * 0.25, 30.0), 70.0)
+            suggestions.append(IngredientSuggestion(additional_candidate, additional_amount, "juice"))
+            juice_hints.append(additional_candidate.name)
+            existing_tags = _collect_tags(suggestions)
 
     if association_model:
         association_model.rebalance_amounts(suggestions)
@@ -982,6 +1282,8 @@ def generate_cocktail_recipe(
             scale = plan.base_ml / suggestions[0].amount_ml
             for suggestion in suggestions:
                 suggestion.amount_ml *= scale
+
+    _ensure_palate_balance(suggestions, plan)
 
     existing_tags = _collect_tags(suggestions)
 
@@ -1007,16 +1309,36 @@ def generate_cocktail_recipe(
 
     total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)
     top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
+    if top_up_needed > 15:
+        candidate = _select_lengthener_candidate(
+            juices_pool,
+            profile,
+            association_model=association_model,
+            existing_tags=existing_tags,
+            used_names=used_juice_names,
+            keyword_hints=juice_hints,
+        )
+        if candidate:
+            used_juice_names.add(_normalize(candidate.name))
+            suggestions.append(
+                IngredientSuggestion(candidate, max(top_up_needed, 40.0), "juice")
+            )
+            _ensure_palate_balance(suggestions, plan)
+            existing_tags = _collect_tags(suggestions)
+            total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)
+            top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
+
     lengthener_note = None
     if top_up_needed > 15:
-        if plan.juice_focus:
-            lengthener_note = (
-                f"Top up with {top_up_needed:.0f} ml chilled {plan.juice_focus} juice to finish the serve."
-            )
-        else:
-            lengthener_note = (
-                f"Top up with {top_up_needed:.0f} ml chilled soda or filtered water to finish the serve."
-            )
+        fallback_name = primary_juice_name
+        if not fallback_name and plan.juice_focus:
+            focus = plan.juice_focus.strip()
+            fallback_name = focus if "juice" in focus.lower() else f"{focus} juice"
+        if not fallback_name:
+            fallback_name = "seasonal juice"
+        lengthener_note = (
+            f"Top up with {top_up_needed:.0f} ml chilled {fallback_name.lower()} to finish the serve."
+        )
 
     steps = _build_steps(recipe_name, suggestions, glassware, ice, garnish_name, lengthener_note)
 
