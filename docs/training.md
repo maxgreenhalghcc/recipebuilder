@@ -35,8 +35,8 @@ A compact JSON representation might look like:
 }
 ```
 
-Collect multiple entries like this in a file (for example
-`data/training/successful_cocktails.json`).
+Collect multiple entries like this in individual files or a combined collection
+within the `data/training/successful_cocktails/` directory.
 
 ## 2. Convert logs into training observations
 
@@ -48,7 +48,7 @@ filtered out by raising the `rating_floor` value.
 ```python
 from recipebuilder import load_training_samples, build_observations_from_samples
 
-samples = load_training_samples("data/training/successful_cocktails.json")
+samples = load_training_samples("data/training/successful_cocktails")
 observations = build_observations_from_samples(samples, rating_floor=0.3)
 ```
 

@@ -23,7 +23,7 @@ if __name__ == "__main__":
         ]
     )
 
-    samples = load_training_samples("data/training/successful_cocktails.json")
+    samples = load_training_samples("data/training/successful_cocktails")
     model = train_model_from_samples(samples, base_model=seed_model, rating_floor=0.2)
     save_model_weights(model, "data/training/latest_weights.json")
 

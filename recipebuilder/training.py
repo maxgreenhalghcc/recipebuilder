@@ -24,6 +24,20 @@ def _ensure_list(value: object) -> List[str]:
     return []
 
 
+def _iter_sample_payloads(raw: object) -> Iterable[Dict[str, object]]:
+    """Yield raw sample dictionaries from nested JSON payloads."""
+
+    if isinstance(raw, dict):
+        if "samples" in raw and isinstance(raw["samples"], Sequence):
+            for entry in raw["samples"]:
+                yield from _iter_sample_payloads(entry)
+        else:
+            yield raw
+    elif isinstance(raw, Sequence) and not isinstance(raw, (str, bytes)):
+        for entry in raw:
+            yield from _iter_sample_payloads(entry)
+
+
 @dataclass
 class CocktailTrainingIngredient:
     """Ingredient used in a logged cocktail outcome."""
@@ -175,27 +189,30 @@ def train_model_from_samples(
 
 
 def load_training_samples(path: Path | str) -> List[CocktailTrainingSample]:
-    """Load cocktail training samples from a JSON file."""
+    """Load cocktail training samples from a JSON file or directory."""
 
     file_path = Path(path)
     if not file_path.exists():
         raise FileNotFoundError(f"Training sample data not found at {file_path!s}.")
 
+    if file_path.is_dir():
+        samples: List[CocktailTrainingSample] = []
+        for candidate in sorted(file_path.glob("*.json")):
+            samples.extend(load_training_samples(candidate))
+        return samples
+
     with file_path.open("r", encoding="utf-8") as handle:
         raw = json.load(handle)
 
-    if isinstance(raw, dict) and "samples" in raw:
-        entries = raw["samples"]
-    else:
-        entries = raw
-
-    if not isinstance(entries, Sequence):
-        raise ValueError("Training JSON must be a list or contain a 'samples' list.")
+    payloads = list(_iter_sample_payloads(raw))
+    if not payloads:
+        raise ValueError(
+            "Training JSON must contain sample objects or a 'samples' collection."
+        )
 
     samples: List[CocktailTrainingSample] = []
-    for entry in entries:
-        if isinstance(entry, dict):
-            samples.append(CocktailTrainingSample.from_dict(entry))
+    for entry in payloads:
+        samples.append(CocktailTrainingSample.from_dict(entry))
     return samples
 
 

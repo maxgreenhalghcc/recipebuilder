@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from itertools import combinations
 from statistics import mean
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
 
 from recipebuilder.preferences import build_preference_plan, collect_profile_tags
@@ -131,6 +131,7 @@ class FlavourAssociationModel:
         self._pair_bias: Dict[Tuple[str, str], float] = defaultdict(float)
         self._role_ratio_bias: Dict[str, List[float]] = defaultdict(list)
         self._role_presence_bias: Dict[str, float] = defaultdict(float)
+        self._ratio_signatures: List[Tuple[frozenset[str], Dict[str, float], float]] = []
 
     @staticmethod
     def _normalize_tag(tag: str) -> str:
@@ -152,6 +153,7 @@ class FlavourAssociationModel:
             for first, second in combinations(sorted(tags), 2):
                 self._pair_bias[(first, second)] += weight / (len(tags) - 1)
 
+        normalized_role_map: Dict[str, float] = {}
         if observation.role_ratios:
             total = sum(value for value in observation.role_ratios.values() if value > 0)
             if total > 0:
@@ -160,8 +162,12 @@ class FlavourAssociationModel:
                         continue
                     normalized_ratio = ratio / total
                     key = role.strip().lower()
+                    normalized_role_map[key] = normalized_ratio
                     self._role_ratio_bias[key].append(normalized_ratio)
                     self._role_presence_bias[key] += weight * normalized_ratio
+
+        if normalized_role_map:
+            self._ratio_signatures.append((frozenset(tags), dict(normalized_role_map), weight))
 
     def train(self, observations: Iterable[FlavourAssociationObservation]) -> None:
         for observation in observations:
@@ -172,11 +178,20 @@ class FlavourAssociationModel:
 
         pair_bias = {"||".join(pair): value for pair, value in self._pair_bias.items()}
         role_ratio_bias = {role: list(values) for role, values in self._role_ratio_bias.items()}
+        ratio_signatures = [
+            {
+                "tags": sorted(tags),
+                "role_ratios": dict(ratio_map),
+                "weight": weight,
+            }
+            for tags, ratio_map, weight in self._ratio_signatures
+        ]
         return {
             "tag_bias": dict(self._tag_bias),
             "pair_bias": pair_bias,
             "role_ratio_bias": role_ratio_bias,
             "role_presence_bias": dict(self._role_presence_bias),
+            "ratio_signatures": ratio_signatures,
         }
 
     def save_weights(self, path: Path | str) -> None:
@@ -216,6 +231,46 @@ class FlavourAssociationModel:
         if isinstance(role_presence_bias, dict):
             for role, value in role_presence_bias.items():
                 model._role_presence_bias[str(role)] = float(value)
+
+        ratio_signatures = data.get("ratio_signatures", {})
+        if isinstance(ratio_signatures, Sequence):
+            for entry in ratio_signatures:
+                if not isinstance(entry, dict):
+                    continue
+                tags_raw = entry.get("tags")
+                ratios_raw = entry.get("role_ratios")
+                if not isinstance(ratios_raw, dict):
+                    continue
+                normalized_map: Dict[str, float] = {}
+                total = 0.0
+                for role, value in ratios_raw.items():
+                    try:
+                        ratio_value = float(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if ratio_value <= 0:
+                        continue
+                    key = str(role).strip().lower()
+                    normalized_map[key] = ratio_value
+                    total += ratio_value
+                if not normalized_map:
+                    continue
+                if total > 0 and abs(total - 1.0) > 1e-9:
+                    normalized_map = {
+                        role: value / total for role, value in normalized_map.items()
+                    }
+                tags: Set[str] = set()
+                if isinstance(tags_raw, Sequence) and not isinstance(tags_raw, (str, bytes)):
+                    for tag in tags_raw:
+                        normalized_tag = cls._normalize_tag(str(tag))
+                        if normalized_tag:
+                            tags.add(normalized_tag)
+                weight_value = entry.get("weight", 0.0)
+                try:
+                    weight = float(weight_value)
+                except (TypeError, ValueError):
+                    weight = 0.0
+                model._ratio_signatures.append((frozenset(tags), dict(normalized_map), weight))
 
         return model
 
@@ -281,6 +336,39 @@ class FlavourAssociationModel:
 
         return score
 
+    def _collect_suggestion_tags(
+        self, suggestions: Sequence[IngredientSuggestion]
+    ) -> Set[str]:
+        tags: Set[str] = set()
+        for suggestion in suggestions:
+            for tag in suggestion.ingredient.flavour_tags:
+                normalized = self._normalize_tag(tag)
+                if normalized:
+                    tags.add(normalized)
+        return tags
+
+    def _find_ratio_signature(
+        self, suggestion_tags: Set[str]
+    ) -> Optional[Tuple[Dict[str, float], float]]:
+        if not suggestion_tags or not self._ratio_signatures:
+            return None
+
+        best_match: Optional[Tuple[Dict[str, float], float]] = None
+        best_score = 0.0
+        for tags, ratio_map, weight in self._ratio_signatures:
+            if not tags:
+                continue
+            overlap = len(suggestion_tags & tags)
+            if overlap <= 0:
+                continue
+            coverage = overlap / len(tags)
+            presence = overlap / len(suggestion_tags)
+            score = (coverage * 0.6 + presence * 0.4) * max(weight, 0.0)
+            if score > best_score:
+                best_score = score
+                best_match = (dict(ratio_map), score)
+        return best_match
+
     def estimate_role_ratios(
         self, suggestions: Sequence[IngredientSuggestion]
     ) -> Dict[str, float]:
@@ -295,6 +383,8 @@ class FlavourAssociationModel:
         if not baseline:
             baseline = dict(self.DEFAULT_ROLE_RATIOS)
 
+        suggestion_tags = self._collect_suggestion_tags(suggestions)
+        suggestion_roles = {_normalize(s.role) for s in suggestions if s.role}
         ratios: Dict[str, float] = {}
         for suggestion in suggestions:
             if suggestion.amount_ml <= 0:
@@ -320,9 +410,33 @@ class FlavourAssociationModel:
 
         total = sum(value for value in ratios.values() if value > 0)
         if total <= 0:
-            return baseline
+            return dict(baseline)
 
-        normalized = {role: max(value / total, 0.0) for role, value in ratios.items()}
+        normalized = {
+            role: max(value / total, 0.0)
+            for role, value in ratios.items()
+            if value > 0
+        }
+
+        signature = self._find_ratio_signature(suggestion_tags)
+        if signature:
+            signature_map, score = signature
+            relevant_signature = {
+                role: value for role, value in signature_map.items() if role in suggestion_roles
+            }
+            if relevant_signature:
+                blend = min(0.5, max(0.0, score))
+                signature_roles = set(relevant_signature)
+                for role in set(normalized) | signature_roles:
+                    base_value = normalized.get(role, 0.0)
+                    target_value = relevant_signature.get(role, base_value)
+                    normalized[role] = base_value * (1 - blend) + target_value * blend
+                total = sum(normalized.values())
+                if total > 0:
+                    normalized = {
+                        role: value / total for role, value in normalized.items() if value > 0
+                    }
+
         missing_roles = set(baseline) - set(normalized)
         if missing_roles:
             remainder = sum(normalized.values())
@@ -361,6 +475,8 @@ class FlavourAssociationModel:
 
 
 _DEFAULT_ASSOCIATION_PATH = Path("data/flavour_associations.json")
+_DEFAULT_ASSOCIATION_WEIGHTS_PATH = Path("data/training/latest_weights.json")
+_DEFAULT_SUCCESSFUL_SAMPLE_PATH = Path("data/training/successful_cocktails")
 _DEFAULT_ASSOCIATION_MODEL: Optional[FlavourAssociationModel] = None
 
 
@@ -368,10 +484,34 @@ def _load_default_association_model() -> Optional[FlavourAssociationModel]:
     global _DEFAULT_ASSOCIATION_MODEL
     if _DEFAULT_ASSOCIATION_MODEL is not None:
         return _DEFAULT_ASSOCIATION_MODEL
-    if _DEFAULT_ASSOCIATION_PATH.exists():
-        _DEFAULT_ASSOCIATION_MODEL = FlavourAssociationModel.from_file(_DEFAULT_ASSOCIATION_PATH)
-    else:
-        _DEFAULT_ASSOCIATION_MODEL = None
+    if _DEFAULT_ASSOCIATION_WEIGHTS_PATH.exists():
+        try:
+            _DEFAULT_ASSOCIATION_MODEL = FlavourAssociationModel.from_weights_file(
+                _DEFAULT_ASSOCIATION_WEIGHTS_PATH
+            )
+        except (FileNotFoundError, ValueError, json.JSONDecodeError):
+            _DEFAULT_ASSOCIATION_MODEL = None
+    if _DEFAULT_ASSOCIATION_MODEL is None:
+        if _DEFAULT_ASSOCIATION_PATH.exists():
+            _DEFAULT_ASSOCIATION_MODEL = FlavourAssociationModel.from_file(
+                _DEFAULT_ASSOCIATION_PATH
+            )
+        else:
+            _DEFAULT_ASSOCIATION_MODEL = FlavourAssociationModel()
+
+    if _DEFAULT_SUCCESSFUL_SAMPLE_PATH.exists():
+        try:
+            from recipebuilder.training import load_training_samples, train_model_from_samples
+
+            samples = load_training_samples(_DEFAULT_SUCCESSFUL_SAMPLE_PATH)
+        except (FileNotFoundError, ValueError, json.JSONDecodeError):
+            samples = []
+        if samples:
+            _DEFAULT_ASSOCIATION_MODEL = train_model_from_samples(
+                samples,
+                base_model=_DEFAULT_ASSOCIATION_MODEL,
+                rating_floor=0.1,
+            )
     return _DEFAULT_ASSOCIATION_MODEL
 
 

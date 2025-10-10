@@ -1,0 +1,13 @@
+{
+  "name": "Margarita",
+  "success_score": 4.5,
+  "max_score": 5,
+  "tags": ["citrus", "classic", "balanced"],
+  "metadata": {"glassware": "rocks", "ice": "cubed"},
+  "ingredients": [
+    {"name": "Vodka", "role": "base", "amount_ml": 25, "flavour_tags": ["vodka", "clean", "neutral"]},
+    {"name": "Triple Sec", "role": "modifier", "amount_ml": 25, "flavour_tags": ["orange", "citrus", "liqueur"]},
+    {"name": "Lime Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["lime", "zesty", "citrus"]},
+    {"name": "Sugar Syrup", "role": "sweetener", "amount_ml": 25, "flavour_tags": ["sugar", "sweet", "classic"]}
+  ]
+}

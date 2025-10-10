@@ -5,6 +5,7 @@
       "success_score": 4.9,
       "max_score": 5,
       "tags": ["refreshing", "herbal", "citrus"],
+      "metadata": {"glassware": "highball", "ice": "cubed"},
       "ingredients": [
         {"name": "Cross Axes Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["botanical", "citrus", "juniper"]},
         {"name": "Elderflower Liqueur", "role": "modifier", "amount_ml": 20, "flavour_tags": ["floral", "sweet"]},
@@ -17,6 +18,7 @@
       "success_score": 4.6,
       "max_score": 5,
       "tags": ["smoky", "agave", "bold"],
+      "metadata": {"glassware": "rocks", "ice": "block"},
       "ingredients": [
         {"name": "Mezcal", "role": "base", "amount_ml": 55, "flavour_tags": ["smoke", "agave", "earthy"]},
         {"name": "Ancho Chile Liqueur", "role": "modifier", "amount_ml": 15, "flavour_tags": ["spice", "sweet"]},
@@ -28,6 +30,7 @@
       "success_score": 4.8,
       "max_score": 5,
       "tags": ["dessert", "coffee", "chocolate"],
+      "metadata": {"glassware": "coupe", "ice": "none"},
       "ingredients": [
         {"name": "Dark Rum", "role": "base", "amount_ml": 45, "flavour_tags": ["rum", "caramel"]},
         {"name": "Cold Brew Coffee", "role": "modifier", "amount_ml": 30, "flavour_tags": ["coffee", "bitter"]},
