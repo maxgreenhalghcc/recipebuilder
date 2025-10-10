@@ -1,0 +1,51 @@
+{
+  "ingredients": [
+    {
+      "name": "Juniper Grove Gin",
+      "category": "spirit",
+      "sub_category": "gin",
+      "flavour_tags": ["herbal", "citrus", "floral"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Oloroso Sherry",
+      "category": "modifier",
+      "flavour_tags": ["nutty", "rich", "oak"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Italicus Rosolio",
+      "category": "liqueur",
+      "flavour_tags": ["floral", "citrus", "herbal"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Lime Juice",
+      "category": "juice",
+      "flavour_tags": ["citrus", "bright"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Honey Syrup",
+      "category": "sweetener",
+      "flavour_tags": ["honey", "sweet", "floral"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Orange Bitters",
+      "category": "modifier",
+      "flavour_tags": ["citrus", "bitter"],
+      "default_measure_ml": 2
+    },
+    {
+      "name": "Dehydrated Lime Wheel",
+      "category": "garnish",
+      "flavour_tags": ["citrus", "aromatic"]
+    },
+    {
+      "name": "Large Clear Ice Cube",
+      "category": "ice",
+      "flavour_tags": ["clean"]
+    }
+  ]
+}
