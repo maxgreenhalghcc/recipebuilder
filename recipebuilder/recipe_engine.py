@@ -12,6 +12,20 @@ import json
 from recipebuilder.preferences import build_preference_plan, collect_profile_tags
 
 
+def _coerce_string_list(value: Optional[object]) -> List[str]:
+    """Convert free-form JSON fields into a clean list of strings."""
+
+    if value is None:
+        return []
+    if isinstance(value, str):
+        parts = [segment.strip() for segment in value.split(",")]
+    elif isinstance(value, (list, tuple, set)):
+        parts = [str(item).strip() for item in value]
+    else:
+        parts = [str(value).strip()]
+    return [part for part in parts if part]
+
+
 @dataclass
 class Ingredient:
     """Represents a single stock ingredient."""
@@ -23,20 +37,48 @@ class Ingredient:
     default_measure_ml: Optional[float] = None
     preparation: Optional[str] = None
     notes: Optional[str] = None
+    seasons: Sequence[str] = ()
+    aromas: Sequence[str] = ()
+    profiles: Sequence[str] = ()
+    pairing_spirits: Sequence[str] = ()
 
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "Ingredient":
-        tags = data.get("flavour_tags") or []
-        if isinstance(tags, str):
-            tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+        tags = _coerce_string_list(data.get("flavour_tags"))
+        profiles = _coerce_string_list(data.get("profiles"))
+        aromas = _coerce_string_list(data.get("aromas"))
+        seasons = _coerce_string_list(data.get("seasons"))
+
+        if profiles:
+            tags.extend(profiles)
+        if aromas:
+            tags.extend(aromas)
+        if seasons:
+            tags.extend(seasons)
+
+        if tags:
+            unique_tags: List[str] = []
+            seen = set()
+            for tag in tags:
+                key = tag.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique_tags.append(tag)
+            tags = unique_tags
+
         return cls(
             name=str(data["name"]),
-            category=str(data.get("category", "other")),
+            category=str(data.get("category") or data.get("type") or "other"),
             flavour_tags=list(tags),
             sub_category=(str(data["sub_category"]) if data.get("sub_category") else None),
             default_measure_ml=(float(data["default_measure_ml"]) if data.get("default_measure_ml") else None),
             preparation=(str(data["preparation"]) if data.get("preparation") else None),
             notes=(str(data["notes"]) if data.get("notes") else None),
+            seasons=seasons,
+            aromas=aromas,
+            profiles=profiles,
+            pairing_spirits=_coerce_string_list(data.get("spirits")),
         )
 
 
