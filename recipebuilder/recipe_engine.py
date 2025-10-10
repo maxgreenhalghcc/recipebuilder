@@ -544,6 +544,8 @@ class StockRepository:
         candidates = [self.stock_root / f"{token}.json"]
         if token != bar_id:
             candidates.append(self.stock_root / f"{bar_id}.json")
+        if "_" in token:
+            candidates.append(self.stock_root / f"{token.replace('_', '')}.json")
 
         path = next((candidate for candidate in candidates if candidate.exists()), None)
         if path is None:
@@ -554,17 +556,35 @@ class StockRepository:
         with path.open("r", encoding="utf-8") as handle:
             raw = json.load(handle)
 
-        if isinstance(raw, dict) and "ingredients" in raw:
-            items = raw["ingredients"]
-        else:
-            items = raw
+        items: object = raw
+        if isinstance(raw, dict):
+            if isinstance(raw.get("ingredients"), list):
+                items = raw["ingredients"]
+            elif isinstance(raw.get("flavour_matrix"), list):
+                items = raw["flavour_matrix"]
+            elif len(raw) == 1:
+                only_value = next(iter(raw.values()))
+                if isinstance(only_value, dict):
+                    if isinstance(only_value.get("ingredients"), list):
+                        items = only_value["ingredients"]
+                    elif isinstance(only_value.get("flavour_matrix"), list):
+                        items = only_value["flavour_matrix"]
+                    else:
+                        items = only_value
+                else:
+                    items = only_value
 
         if not isinstance(items, list):
-            raise ValueError("Stock list JSON must be a list or contain an 'ingredients' list.")
+            raise ValueError(
+                "Stock list JSON must be a list or include an 'ingredients' or 'flavour_matrix' list."
+            )
 
         ingredients = []
         for entry in items:
             if not isinstance(entry, dict):
+                continue
+            name_value = entry.get("name")
+            if not name_value or not str(name_value).strip():
                 continue
             try:
                 ingredient = Ingredient.from_dict(entry)
