@@ -39,6 +39,13 @@ def _load_association_model() -> Optional[FlavourAssociationModel]:
 _ASSOCIATION_MODEL = _load_association_model()
 
 
+@app.get("/health")
+def health_check():  # pragma: no cover - trivial endpoint
+    """Simple health probe so hosting platforms can verify readiness."""
+
+    return jsonify({"ok": True}), 200
+
+
 def _normalise_responses(payload: Dict[str, object]) -> Dict[str, Optional[str]]:
     """Ensure all questionnaire fields are treated as strings or None."""
 
