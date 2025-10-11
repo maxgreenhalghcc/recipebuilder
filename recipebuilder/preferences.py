@@ -40,7 +40,6 @@ _GLASS_PROFILES = _load_profile_map("glass_profiles.json")
 _DINING_PROFILES = _load_profile_map("dining_profiles.json")
 _MUSIC_PROFILES = _load_profile_map("music_profiles.json")
 _AROMA_PROFILES = _load_profile_map("aroma_profiles.json")
-_DESSERT_PROFILES = _load_profile_map("dessert_profiles.json")
 _BITTERNESS_PROFILES = _load_profile_map("bitterness_profiles.json")
 _CARBONATION_PROFILES = _load_profile_map("carbonation_profiles.json")
 _ABV_PROFILES = _load_profile_map("abv_profiles.json")
@@ -174,6 +173,169 @@ def _apply_allergen_rules(
         if isinstance(explanation, str) and explanation.strip():
             explanations.append(explanation.strip())
     return explanations
+
+
+def _build_dessert_proxy_profile(
+    sweetener_key: str, season_key: str, aroma_key: str
+) -> Optional[Dict[str, object]]:
+    """Synthesize the retired dessert signal from sweetness, season, and aroma."""
+
+    tags: Set[str] = set()
+    taste_bias: Dict[str, float] = {}
+    candidate_families: Dict[str, float] = {}
+    shift_low = 0.0
+    shift_high = 0.0
+    explain_parts: List[str] = []
+
+    def add_tags(values: Iterable[str], note: Optional[str] = None) -> None:
+        for value in values:
+            cleaned = str(value).strip()
+            if cleaned:
+                tags.add(cleaned)
+        if note:
+            explain_parts.append(note)
+
+    def add_taste(delta: Mapping[str, float]) -> None:
+        for key, value in delta.items():
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            normalized = _normalize(key)
+            taste_bias[normalized] = taste_bias.get(normalized, 0.0) + numeric
+
+    def add_shift(delta_low: float, delta_high: float) -> None:
+        nonlocal shift_low, shift_high
+        shift_low += float(delta_low)
+        shift_high += float(delta_high)
+
+    def add_families(weights: Mapping[str, float]) -> None:
+        for family, weight in weights.items():
+            try:
+                numeric = float(weight)
+            except (TypeError, ValueError):
+                continue
+            normalized = str(family).strip()
+            if not normalized:
+                continue
+            current = candidate_families.get(normalized, 1.0)
+            candidate_families[normalized] = current * numeric
+
+    sweetener_cases = {
+        "rich": {
+            "tags": ["vanilla", "caramel", "indulgent"],
+            "taste": {"sweet": 0.02, "sour": -0.02, "bitter": 0.01},
+            "shift": (0.03, 0.05),
+            "families": {"maple": 1.25, "demerara": 1.15, "vanilla": 1.2, "honey": 1.1},
+            "note": "Sweetness style rich → vanilla/caramel tilt and rounder sweetness.",
+        },
+        "floral": {
+            "tags": ["floral", "elegant", "light"],
+            "taste": {"sweet": 0.01, "bitter": -0.01},
+            "families": {"elderflower": 1.25, "italicus": 1.15, "honey_light": 1.1},
+            "note": "Sweetness style floral → perfumed sweetness cues.",
+        },
+        "zesty": {
+            "tags": ["zesty", "citrus", "bright"],
+            "taste": {"sour": 0.02, "sweet": -0.01},
+            "shift": (-0.02, 0.0),
+            "families": {"citrus_liqueur": 1.2, "lime_cordial": 1.2},
+            "note": "Sweetness style zesty → higher acid posture and citrus bias.",
+        },
+        "classic": {
+            "tags": ["balanced", "clean"],
+            "families": {"simple_syrup": 1.2, "demerara_light": 1.1},
+            "note": "Sweetness style classic → neutral sugar backbone.",
+        },
+    }
+
+    sweetener_case = sweetener_cases.get(sweetener_key)
+    if sweetener_case:
+        add_tags(sweetener_case.get("tags", []), sweetener_case.get("note"))
+        add_taste(sweetener_case.get("taste", {}))
+        if "shift" in sweetener_case:
+            low, high = sweetener_case["shift"]
+            add_shift(low, high)
+        add_families(sweetener_case.get("families", {}))
+
+    season_cases = {
+        "spring": {
+            "tags": ["berry", "fresh"],
+            "families": {"berry": 1.1},
+            "note": "Season spring → lean toward fresh berry highlights.",
+        },
+        "summer": {
+            "tags": ["stone-fruit", "tropical"],
+            "families": {"stone_fruit": 1.1, "tropical": 1.05},
+            "note": "Season summer → encourage stone-fruit & tropical layers.",
+        },
+        "autumn": {
+            "tags": ["spice", "woody"],
+            "families": {"baking_spice": 1.1, "maple": 1.05},
+            "note": "Season autumn → add warming spice/maple cues.",
+        },
+        "winter": {
+            "tags": ["vanilla", "indulgent"],
+            "families": {"vanilla": 1.1, "caramel": 1.05},
+            "note": "Season winter → reinforce vanilla/caramel comfort.",
+        },
+    }
+
+    season_case = season_cases.get(season_key)
+    if season_case:
+        add_tags(season_case.get("tags", []), season_case.get("note"))
+        add_families(season_case.get("families", {}))
+
+    aroma_cases = {
+        "citrus": {
+            "tags": ["citrus"],
+            "families": {"citrus_liqueur": 1.1},
+            "note": "Aroma citrus tie-break → keep citrus accents forward.",
+        },
+        "floral": {
+            "tags": ["floral"],
+            "families": {"elderflower": 1.1},
+            "note": "Aroma floral tie-break → support elderflower/Italicus picks.",
+        },
+        "woody": {
+            "tags": ["woody"],
+            "families": {"oak_spice": 1.1},
+            "note": "Aroma woody tie-break → open door to oak & spice bitters.",
+        },
+        "sweet": {
+            "tags": ["vanilla", "caramel"],
+            "families": {"vanilla": 1.1, "caramel": 1.05},
+            "note": "Aroma sweet tie-break → gentle vanilla/caramel lean.",
+        },
+    }
+
+    aroma_case = aroma_cases.get(aroma_key)
+    if aroma_case:
+        add_tags(aroma_case.get("tags", []), aroma_case.get("note"))
+        add_families(aroma_case.get("families", {}))
+
+    if not tags and not taste_bias and not candidate_families and abs(shift_low) < 1e-6 and abs(shift_high) < 1e-6:
+        return None
+
+    profile: Dict[str, object] = {"_weight": 0.6}
+    profile["tags"] = sorted(tags)
+    if taste_bias:
+        profile["taste_bias"] = taste_bias
+    if abs(shift_low) > 1e-6 or abs(shift_high) > 1e-6:
+        profile["sweet_acid_window_shift"] = (shift_low, shift_high)
+    if candidate_families:
+        profile["candidate_bias"] = {"families": candidate_families}
+
+    base_message = (
+        "Dessert proxy derived from sweetness style (+ season/aroma) to shape aromatic sweetness, "
+        "fruit family and sweet:acid posture."
+    )
+    if explain_parts:
+        profile["explain"] = " ".join([base_message] + explain_parts)
+    else:
+        profile["explain"] = base_message
+
+    return profile
 
 
 @dataclass
@@ -313,11 +475,12 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     dining_key = _normalize(responses.get("dining_style") or "")
     music_key = _normalize(responses.get("music_preference") or "")
     aroma_key = _normalize(responses.get("aroma_preference") or "")
-    dessert_key = _normalize(responses.get("favourite_dessert") or "")
     sweetener_key = _normalize(responses.get("sweetener_question") or "")
     bitterness_key = _normalize(responses.get("bitterness_tolerance") or "")
     carbonation_key = _normalize(responses.get("carbonation_texture") or "")
     abv_key = _normalize(responses.get("abv_lane") or "")
+
+    dessert_proxy = _build_dessert_proxy_profile(sweetener_key, season_key, aroma_key)
 
     profiles = [
         _SEASON_PROFILES.get(season_key, {}),
@@ -325,12 +488,14 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         _DINING_PROFILES.get(dining_key, {}),
         _MUSIC_PROFILES.get(music_key, {}),
         _AROMA_PROFILES.get(aroma_key, {}),
-        _DESSERT_PROFILES.get(dessert_key, {}),
         _BITTERNESS_PROFILES.get(bitterness_key, {}),
         _CARBONATION_PROFILES.get(carbonation_key, {}),
         _ABV_PROFILES.get(abv_key, {}),
         _SWEETENER_STYLES.get(sweetener_key, {}),
     ]
+
+    if dessert_proxy:
+        profiles.append(dessert_proxy)
 
     template_weights: Dict[str, float] = defaultdict(float)
     ratio_ranges: Dict[str, list[Tuple[float, float]]] = defaultdict(list)
@@ -349,7 +514,7 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     seasonal_tags: set[str] = set()
     sweetness_windows = []
     abv_ranges: list[Tuple[float, float]] = []
-    sparkle_biases: list[float] = []
+    sparkle_biases: list[Tuple[float, float]] = []
     sparkle_allowances: list[bool] = []
     ingredient_caps: list[int] = []
     ice_programs: list[str] = []
@@ -367,48 +532,56 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     for profile in profiles:
         if not profile:
             continue
+        raw_weight = profile.get("_weight", 1.0)
+        try:
+            profile_weight = float(raw_weight)
+        except (TypeError, ValueError):
+            profile_weight = 1.0
+        if profile_weight <= 0:
+            continue
+
         tags = profile.get("tags") or []
         aroma_tags = profile.get("aroma_tags") or []
         for tag in tags:
-            tag_weights[_normalize(tag)] += 1.0
+            tag_weights[_normalize(tag)] += profile_weight
         for tag in aroma_tags:
             normalized = _normalize(tag)
-            tag_weights[normalized] += 1.0
-            aroma_bias[normalized] += 1.0
+            tag_weights[normalized] += profile_weight
+            aroma_bias[normalized] += profile_weight
             seasonal_tags.add(normalized)
 
         taste = profile.get("taste_bias") or {}
         if isinstance(taste, Mapping):
-            _merge_numeric_map(taste_bias, taste)
+            _merge_numeric_map(taste_bias, taste, profile_weight)
 
         structure = profile.get("structure_bias") or {}
         if isinstance(structure, Mapping):
             for key, value in structure.items():
                 numeric = _structure_value(_normalize(key), value)
                 if numeric is not None:
-                    structure_bias[_normalize(key)] += numeric
+                    structure_bias[_normalize(key)] += numeric * profile_weight
             sparkle = structure.get("sparkle")
             sparkle_numeric = _structure_value("sparkle", sparkle)
             if sparkle_numeric is not None:
-                sparkle_biases.append(sparkle_numeric)
+                sparkle_biases.append((sparkle_numeric, profile_weight))
 
         affect = profile.get("affect_tags") or []
         for tag in affect:
-            affect_bias[_normalize(tag)] += 1.0
+            affect_bias[_normalize(tag)] += profile_weight
 
         preferred_templates = profile.get("preferred_templates") or {}
         if isinstance(preferred_templates, Mapping):
-            for template_id, weight in preferred_templates.items():
+            for template_id, template_weight in preferred_templates.items():
                 try:
-                    template_weights[_normalize(template_id)] += float(weight)
+                    template_weights[_normalize(template_id)] += float(template_weight) * profile_weight
                 except (TypeError, ValueError):
                     continue
 
         template_bias = profile.get("template_bias") or {}
         if isinstance(template_bias, Mapping):
-            for template_id, weight in template_bias.items():
+            for template_id, template_weight in template_bias.items():
                 try:
-                    template_weights[_normalize(template_id)] += float(weight)
+                    template_weights[_normalize(template_id)] += float(template_weight) * profile_weight
                 except (TypeError, ValueError):
                     continue
 
@@ -426,15 +599,15 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         shift = profile.get("sweet_acid_window_shift")
         if isinstance(shift, Sequence) and len(shift) == 2:
             try:
-                sweet_acid_shifts.append((float(shift[0]), float(shift[1])))
+                sweet_acid_shifts.append((float(shift[0]) * profile_weight, float(shift[1]) * profile_weight))
             except (TypeError, ValueError):
                 pass
 
         base_pref = profile.get("base_spirit_bias") or {}
         if isinstance(base_pref, Mapping):
-            for spirit, weight in base_pref.items():
+            for spirit, pref_weight in base_pref.items():
                 try:
-                    base_bias[_normalize(spirit)] += float(weight)
+                    base_bias[_normalize(spirit)] += float(pref_weight) * profile_weight
                 except (TypeError, ValueError):
                     continue
 
@@ -469,23 +642,25 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         if isinstance(candidate_bias_map, Mapping):
             family_bias = candidate_bias_map.get("families") or {}
             if isinstance(family_bias, Mapping):
-                for family, weight in family_bias.items():
+                for family, family_weight in family_bias.items():
                     try:
-                        numeric = float(weight)
+                        numeric = float(family_weight)
                     except (TypeError, ValueError):
                         continue
                     key = _normalize(str(family))
                     current = candidate_family_bias.get(key, 1.0)
+                    numeric = numeric ** max(profile_weight, 0.0) if numeric > 0 else 1.0
                     candidate_family_bias[key] = current * numeric
             item_bias = candidate_bias_map.get("items") or {}
             if isinstance(item_bias, Mapping):
-                for item, weight in item_bias.items():
+                for item, item_weight in item_bias.items():
                     try:
-                        numeric = float(weight)
+                        numeric = float(item_weight)
                     except (TypeError, ValueError):
                         continue
                     key = _normalize(str(item))
                     current = candidate_item_bias.get(key, 1.0)
+                    numeric = numeric ** max(profile_weight, 0.0) if numeric > 0 else 1.0
                     candidate_item_bias[key] = current * numeric
 
         role_bounds = profile.get("role_bounds") or {}
@@ -613,7 +788,11 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         sparkle_allowed = None
 
     if sparkle_biases:
-        sparkle_bias = sum(sparkle_biases) / len(sparkle_biases)
+        total_weight = sum(weight for _, weight in sparkle_biases if weight > 0)
+        if total_weight > 0:
+            sparkle_bias = sum(value * weight for value, weight in sparkle_biases) / total_weight
+        else:
+            sparkle_bias = sum(value for value, _ in sparkle_biases) / len(sparkle_biases)
     else:
         sparkle_bias = None
 
@@ -679,6 +858,23 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
             float(min_value) if min_value is not None else None,
             float(max_value) if max_value is not None else None,
         )
+
+    dominant_template: Optional[str] = None
+    if template_weights:
+        dominant_template = max(template_weights.items(), key=lambda item: item[1])[0]
+
+    base_sweet_min = 0.10
+    base_sweet_max = 0.22
+    if dominant_template == "tpl_martini_style":
+        base_sweet_min = 0.08
+        base_sweet_max = 0.18
+
+    current_sweet_min, current_sweet_max = role_bounds_final.get("sweetener", (None, None))
+    sweet_min = max(base_sweet_min, float(current_sweet_min)) if current_sweet_min is not None else base_sweet_min
+    sweet_max = min(base_sweet_max, float(current_sweet_max)) if current_sweet_max is not None else base_sweet_max
+    if sweet_min > sweet_max:
+        sweet_max = max(sweet_min + 0.02, base_sweet_max)
+    role_bounds_final["sweetener"] = (sweet_min, sweet_max)
 
     lengthener_policy: Dict[str, object] = {}
     if "allow_carbonated" in lengthener_rule_flags:
