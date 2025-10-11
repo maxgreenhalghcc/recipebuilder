@@ -1,3 +1,4 @@
-Flask>=3.0,<4
-Flask-Cors>=4,<5
+Flask>=3,<4
 gunicorn>=21,<22
+# only if you’ll call from a browser
+Flask-Cors>=4,<5
