@@ -40,6 +40,10 @@ if __name__ == "__main__":
         "allergens": "",
         "foam_toggle": "yes",
         "aroma_preference": "citrus",
+        "modifier_question": "emerald",
+        "sweetener_question": "floral",
+        "aroma_preference": "citrus",
+        "favourite_dessert": "fresh fruit",
         "notes": "Guest enjoys bright citrus and a touch of floral sweetness.",
     }
 
