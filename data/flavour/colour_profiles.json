@@ -1,0 +1,46 @@
+{
+  "emerald": {
+    "tags": ["herbal", "fresh", "green", "cooling"],
+    "ratio_nudge": {"modifier": [0.00, 0.03], "sweetener": [-0.02, 0.00], "juice": [0.00, 0.02]},
+    "taste_bias": {"sweet": -0.02, "sour": 0.02, "bitter": 0.02},
+    "preferred_templates": {"tpl_collins": 0.45, "tpl_shaken_sour": 0.35, "tpl_highball": 0.20},
+    "modifiers_pool": ["dry vermouth", "Italicus", "elderflower liqueur"],
+    "sweeteners_pool": ["honey syrup", "simple syrup"],
+    "juice_pool": ["lime juice", "lemon juice"],
+    "bitters_bias": {"aromatic bitters": 0.4, "orange bitters": 0.6},
+    "garnishes": ["mint sprig", "cucumber ribbon", "lime wheel"]
+  },
+  "amber": {
+    "tags": ["caramel", "maple", "woody", "warm"],
+    "ratio_nudge": {"base": [0.01, 0.03], "sweetener": [0.01, 0.03], "juice": [-0.02, 0.00]},
+    "taste_bias": {"sweet": 0.02, "sour": -0.02, "bitter": 0.02},
+    "preferred_templates": {"tpl_martini_style": 0.45, "tpl_collins": 0.35, "tpl_shaken_sour": 0.20},
+    "modifiers_pool": ["amaretto", "aromatic bitters", "ginger liqueur"],
+    "sweeteners_pool": ["maple syrup", "demerara syrup", "vanilla syrup"],
+    "juice_pool": ["orange juice", "cranberry juice"],
+    "bitters_bias": {"aromatic bitters": 0.7, "orange bitters": 0.3},
+    "garnishes": ["orange twist", "rosemary sprig"]
+  },
+  "pale pink": {
+    "tags": ["berry", "floral", "romantic", "light"],
+    "ratio_nudge": {"modifier": [0.01, 0.03], "sweetener": [0.00, 0.02], "juice": [0.01, 0.03]},
+    "taste_bias": {"sweet": 0.01, "sour": 0.01, "bitter": -0.02},
+    "preferred_templates": {"tpl_collins": 0.40, "tpl_highball": 0.35, "tpl_shaken_sour": 0.25},
+    "modifiers_pool": ["grenadine", "elderflower liqueur", "Italicus"],
+    "sweeteners_pool": ["simple syrup", "honey syrup"],
+    "juice_pool": ["cranberry juice", "lemon juice", "orange juice"],
+    "bitters_bias": {"orange bitters": 0.6, "aromatic bitters": 0.4},
+    "garnishes": ["raspberries", "edible flowers", "lemon wheel"]
+  },
+  "citrus yellow": {
+    "tags": ["citrus", "zesty", "bright"],
+    "ratio_nudge": {"juice": [0.02, 0.05], "sweetener": [-0.01, 0.01]},
+    "taste_bias": {"sweet": -0.01, "sour": 0.03, "bitter": 0.00},
+    "preferred_templates": {"tpl_highball": 0.40, "tpl_collins": 0.35, "tpl_shaken_sour": 0.25},
+    "modifiers_pool": ["citrus liqueur", "aperitivo"],
+    "sweeteners_pool": ["simple syrup", "honey syrup"],
+    "juice_pool": ["lemon juice", "lime juice", "orange juice"],
+    "bitters_bias": {"orange bitters": 0.75, "aromatic bitters": 0.25},
+    "garnishes": ["lemon twist", "orange wheel", "grapefruit peel"]
+  }
+}

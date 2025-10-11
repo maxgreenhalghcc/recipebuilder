@@ -1,0 +1,42 @@
+{
+  "vanilla": {
+    "tags": ["sweet", "vanilla", "caramel", "dessert"],
+    "taste_bias": {"sweet": 0.52, "sour": 0.26, "bitter": 0.12, "salt": 0.05, "umami": 0.05},
+    "structure_bias": {"sparkle": -0.4, "body": 0.20},
+    "preferred_templates": {"tpl_martini_style": 0.5, "tpl_shaken_sour": 0.25, "tpl_collins": 0.15, "tpl_highball": 0.10},
+    "ratio_nudge": {"base": [0.02, 0.04], "sweetener": [0.03, 0.06], "juice": [-0.03, 0.00]},
+    "sweet_acid_window": [0.78, 1.05],
+    "base_spirit_bias": {"bourbon": 0.35, "dark rum": 0.30, "vodka": 0.20, "gin": 0.10, "tequila": 0.05},
+    "sweeteners_pool": ["vanilla syrup", "caramel syrup", "demerara syrup", "maple syrup"],
+    "modifiers_pool": ["coffee liqueur", "cocoa liqueur", "orange liqueur", "aromatic bitters"],
+    "juice_pool": ["orange juice", "passion fruit juice"],
+    "garnishes": ["orange twist", "maraschino cherry", "grated nutmeg"]
+  },
+  "tangfastics": {
+    "tags": ["zesty", "citrus", "vibrant", "sour-candy"],
+    "taste_bias": {"sweet": 0.36, "sour": 0.48, "bitter": 0.06, "salt": 0.05, "umami": 0.05},
+    "structure_bias": {"sparkle": 0.45, "body": -0.10},
+    "preferred_templates": {"tpl_highball": 0.45, "tpl_collins": 0.35, "tpl_shaken_sour": 0.20},
+    "ratio_nudge": {"juice": [0.04, 0.07], "sweetener": [0.00, 0.02]},
+    "sweet_acid_window": [0.55, 0.72],
+    "base_spirit_bias": {"vodka": 0.35, "rum": 0.25, "gin": 0.25, "tequila": 0.10, "bourbon": 0.05},
+    "sweeteners_pool": ["simple syrup", "agave syrup"],
+    "modifiers_pool": ["citrus liqueur", "aperitivo"],
+    "juice_pool": ["lime juice", "lemon juice", "orange juice"],
+    "lengtheners": ["soda water", "lemonade", "tonic water"],
+    "garnishes": ["lemon wheel", "orange wheel", "citrus twist"]
+  },
+  "fresh fruit": {
+    "tags": ["fresh", "subtle", "natural", "berry", "stone-fruit"],
+    "taste_bias": {"sweet": 0.32, "sour": 0.44, "bitter": 0.08, "salt": 0.08, "umami": 0.08},
+    "structure_bias": {"sparkle": 0.25, "body": -0.10},
+    "preferred_templates": {"tpl_collins": 0.45, "tpl_highball": 0.35, "tpl_shaken_sour": 0.20},
+    "ratio_nudge": {"juice": [0.02, 0.05], "sweetener": [-0.02, 0.00], "modifier": [0.00, 0.02]},
+    "sweet_acid_window": [0.58, 0.78],
+    "base_spirit_bias": {"gin": 0.35, "vodka": 0.30, "rum": 0.20, "tequila": 0.10, "bourbon": 0.05},
+    "sweeteners_pool": ["simple syrup", "honey syrup"],
+    "modifiers_pool": ["elderflower liqueur", "Italicus", "dry vermouth"],
+    "juice_pool": ["lemon juice", "orange juice", "cranberry juice"],
+    "garnishes": ["fresh fruit slice", "mint sprig", "lemon twist"]
+  }
+}

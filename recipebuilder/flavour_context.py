@@ -4,9 +4,12 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, TYPE_CHECKING
 import json
 import math
+
+if TYPE_CHECKING:  # pragma: no cover - runtime import guard
+    from recipebuilder.preferences import PreferencePlan
 
 
 def _normalize(text: str) -> str:
@@ -400,7 +403,11 @@ class FlavourKnowledgeBase:
             info["roles"] = dict(info.get("roles", {}))
         return {"templates": templates, "adjectives": adjectives}
 
-    def build_target_vector(self, responses: Mapping[str, Optional[str]]) -> FlavourVector:
+    def build_target_vector(
+        self,
+        responses: Mapping[str, Optional[str]],
+        plan: Optional["PreferencePlan"] = None,
+    ) -> FlavourVector:
         tag_weights = self.mapping.target_tags_from_responses(responses)
         taste: MutableMapping[str, float] = {}
         aroma: MutableMapping[str, float] = {}
@@ -430,7 +437,28 @@ class FlavourKnowledgeBase:
                     aroma["tropical"] = aroma.get("tropical", 0.0) + weight
                     affect["refreshing"] = affect.get("refreshing", 0.0) + 0.2 * weight
 
-        return FlavourVector(taste=dict(taste), aroma=dict(aroma), structure=dict(structure), affect=dict(affect)).normalized()
+        if plan is not None:
+            for key, value in plan.taste_bias.items():
+                normalized = _normalize(key)
+                taste[normalized] = taste.get(normalized, 0.0) + float(value)
+            for key, value in plan.aroma_bias.items():
+                normalized = _normalize(key)
+                aroma[normalized] = aroma.get(normalized, 0.0) + float(value)
+            for key, value in plan.structure_bias.items():
+                normalized = _normalize(key)
+                structure[normalized] = structure.get(normalized, 0.0) + float(value)
+            if plan.sparkle_bias is not None:
+                structure["sparkle"] = structure.get("sparkle", 0.0) + float(plan.sparkle_bias)
+            for key, value in plan.affect_bias.items():
+                normalized = _normalize(key)
+                affect[normalized] = affect.get(normalized, 0.0) + float(value)
+
+        return FlavourVector(
+            taste=dict(taste),
+            aroma=dict(aroma),
+            structure=dict(structure),
+            affect=dict(affect),
+        ).normalized()
 
     def ingredient_vector_for(self, name: str) -> Optional[IngredientVector]:
         return self.ingredient_vectors.get(_normalize(name))
@@ -456,6 +484,8 @@ class FlavourKnowledgeBase:
         self,
         target: FlavourVector,
         target_tags: Optional[Mapping[str, float]] = None,
+        *,
+        plan: Optional["PreferencePlan"] = None,
         limit: int = 3,
     ) -> List[PourTemplate]:
         scored: List[Tuple[float, PourTemplate]] = []
@@ -468,6 +498,12 @@ class FlavourKnowledgeBase:
                     continue
         adjective_preferences = self.adjective_preferences.get("adjectives", {})
         template_preferences = self.adjective_preferences.get("templates", {})
+        plan_weights: Dict[str, float] = {}
+        if plan is not None and plan.template_weights:
+            plan_weights = {
+                _normalize(key): float(value)
+                for key, value in plan.template_weights.items()
+            }
         for template in self.templates:
             template_id = _normalize(template.id or template.name)
             affect_bias = template.constraints.get("affect_bias")
@@ -487,6 +523,8 @@ class FlavourKnowledgeBase:
             template_info = template_preferences.get(template_id)
             if template_info:
                 preference_bonus += 0.05 * template_info.get("weight", 0.0)
+            if plan_weights:
+                preference_bonus += 0.1 * plan_weights.get(template_id, 0.0)
             scored.append((similarity + 0.05 * preference_bonus, template))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [template for _, template in scored[:limit]]
