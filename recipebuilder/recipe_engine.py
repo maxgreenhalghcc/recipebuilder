@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from itertools import combinations
 from statistics import mean
@@ -10,7 +10,14 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
 import re
 
-from recipebuilder.preferences import build_preference_plan, collect_profile_tags
+from recipebuilder.preferences import PreferencePlan, build_preference_plan, collect_profile_tags
+from recipebuilder.flavour_context import (
+    FlavourKnowledgeBase,
+    FlavourVector,
+    PourTemplate,
+    compute_recipe_similarity,
+    evaluate_template_constraints,
+)
 
 
 def _coerce_string_list(value: Optional[object]) -> List[str]:
@@ -25,6 +32,36 @@ def _coerce_string_list(value: Optional[object]) -> List[str]:
     else:
         parts = [str(value).strip()]
     return [part for part in parts if part]
+
+
+def _ingredient_families(ingredient: "Ingredient") -> Set[str]:
+    families: Set[str] = set()
+    name = _normalize(ingredient.name)
+    category = _normalize(ingredient.category)
+    if category:
+        families.add(category)
+    tags = {_normalize(tag) for tag in ingredient.flavour_tags}
+    if "amaro" in name or "amaro" in tags:
+        families.add("amaro")
+    if "aperitivo" in name or "aperitivo" in tags:
+        families.add("aperitivo")
+    if "tonic" in name:
+        families.add("tonic_water")
+    if "soda" in name or "sparkling" in name or "club" in name:
+        families.add("carbonated")
+    if "grapefruit" in name or "grapefruit" in tags:
+        families.add("grapefruit")
+    if "bitters" in name or "bitter" in tags:
+        if "orange" in name or "orange" in tags:
+            families.add("bitters_orange")
+        families.add("bitters_aromatic")
+    if "egg white" in name or "aquafaba" in name:
+        families.update({"egg_white", "aquafaba", "foam"})
+    if "vermouth" in name and "dry" in name:
+        families.add("dry_vermouth")
+    if "lemonade" in name:
+        families.add("lemonade")
+    return {family for family in families if family}
 
 
 @dataclass
@@ -42,6 +79,12 @@ class Ingredient:
     aromas: Sequence[str] = ()
     profiles: Sequence[str] = ()
     pairing_spirits: Sequence[str] = ()
+    taste_vector: Dict[str, float] = field(default_factory=dict)
+    aroma_vector: Dict[str, float] = field(default_factory=dict)
+    structure_vector: Dict[str, float] = field(default_factory=dict)
+    flags: Sequence[str] = ()
+    pairing_prior: Dict[str, float] = field(default_factory=dict)
+    compounds: Sequence[str] = ()
 
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "Ingredient":
@@ -80,6 +123,12 @@ class Ingredient:
             aromas=aromas,
             profiles=profiles,
             pairing_spirits=_coerce_string_list(data.get("spirits")),
+            taste_vector={},
+            aroma_vector={},
+            structure_vector={},
+            flags=tuple(),
+            pairing_prior={},
+            compounds=tuple(),
         )
 
 
@@ -479,6 +528,7 @@ _DEFAULT_ASSOCIATION_PATH = Path("data/flavour_associations.json")
 _DEFAULT_ASSOCIATION_WEIGHTS_PATH = Path("data/training/latest_weights.json")
 _DEFAULT_SUCCESSFUL_SAMPLE_PATH = Path("data/training/successful_cocktails")
 _DEFAULT_ASSOCIATION_MODEL: Optional[FlavourAssociationModel] = None
+_DEFAULT_FLAVOUR_KNOWLEDGE: Optional[FlavourKnowledgeBase] = None
 
 
 def _load_default_association_model() -> Optional[FlavourAssociationModel]:
@@ -516,6 +566,13 @@ def _load_default_association_model() -> Optional[FlavourAssociationModel]:
     return _DEFAULT_ASSOCIATION_MODEL
 
 
+def _load_flavour_knowledge() -> FlavourKnowledgeBase:
+    global _DEFAULT_FLAVOUR_KNOWLEDGE
+    if _DEFAULT_FLAVOUR_KNOWLEDGE is None:
+        _DEFAULT_FLAVOUR_KNOWLEDGE = FlavourKnowledgeBase()
+    return _DEFAULT_FLAVOUR_KNOWLEDGE
+
+
 @dataclass
 class CocktailRecipe:
     """Personalized cocktail recipe result."""
@@ -528,6 +585,7 @@ class CocktailRecipe:
     flavour_profile: List[Tuple[str, float]]
     garnish: Optional[str] = None
     notes: Optional[str] = None
+    explanations: Sequence[str] = field(default_factory=list)
 
 
 class UnknownBarError(FileNotFoundError):
@@ -751,6 +809,24 @@ def _ingredient_matches_keywords(ingredient: Ingredient, keywords: Sequence[str]
     return False
 
 
+def _is_carbonated_lengthener(name: str) -> bool:
+    tokens = _normalize(name)
+    return any(
+        keyword in tokens
+        for keyword in (
+            "soda",
+            "tonic",
+            "sparkling",
+            "lemonade",
+            "prosecco",
+            "champagne",
+            "fizz",
+            "ginger beer",
+            "cola",
+        )
+    )
+
+
 def _is_tart_juice(ingredient: Ingredient) -> bool:
     return _ingredient_matches_keywords(ingredient, _TART_JUICE_KEYWORDS)
 
@@ -784,18 +860,84 @@ def _score_ingredient(
     existing_tags: Optional[Sequence[str]] = None,
     role: Optional[str] = None,
     keyword_hints: Optional[Sequence[str]] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> float:
     base_score = 0.0
+    if knowledge_base is not None and target_vector is not None:
+        base_score += knowledge_base.score_ingredient_against_target(
+            ingredient,
+            target_vector,
+            role=role,
+        )
     for tag in ingredient.flavour_tags:
         base_score += profile.get(_normalize(tag), 0.0)
+    bonus = 0.0
+    penalty = 0.0
+    multiplier = 1.0
+    if plan is not None:
+        normalized_name = _normalize(ingredient.name)
+        if role == "base" and plan.base_spirit_bias:
+            for spirit, weight in plan.base_spirit_bias.items():
+                spirit_key = _normalize(spirit)
+                if spirit_key in normalized_name or normalized_name in spirit_key:
+                    bonus += float(weight)
+        pool_map = {
+            "modifier": "modifier",
+            "sweetener": "sweetener",
+            "juice": "juice",
+            "garnish": "garnish",
+        }
+        if role in pool_map and plan.candidate_pools.get(pool_map[role]):
+            normalized_pool = {
+                _normalize(value) for value in plan.candidate_pools.get(pool_map[role], ())
+            }
+            if normalized_name in normalized_pool:
+                bonus += 0.6
+        if plan.lengtheners and role == "juice":
+            normalized_lengtheners = {_normalize(value) for value in plan.lengtheners}
+            if normalized_name in normalized_lengtheners:
+                bonus += 0.4
+        if plan.avoid_or_reduce:
+            lowered = normalized_name
+            for term in plan.avoid_or_reduce:
+                keyword = _normalize(term)
+                if keyword and keyword in lowered:
+                    penalty += 0.5
+        if plan.bitterness_tolerance is not None:
+            bitter_tokens = {
+                tag
+                for tag in (_normalize(tag) for tag in ingredient.flavour_tags)
+                if "bitter" in tag
+            }
+            if bitter_tokens:
+                bias = plan.bitterness_tolerance - 0.5
+                bonus += 0.4 * bias
+        if plan.candidate_family_bias:
+            families = _ingredient_families(ingredient)
+            for family in families:
+                weight = plan.candidate_family_bias.get(family)
+                if weight is not None:
+                    multiplier *= float(weight)
+        if plan.candidate_item_bias:
+            item_weight = plan.candidate_item_bias.get(normalized_name)
+            if item_weight is not None:
+                multiplier *= float(item_weight)
+        bitter_cap = plan.taste_caps.get("bitter") if plan.taste_caps else None
+        if bitter_cap is not None:
+            tag_set = {_normalize(tag) for tag in ingredient.flavour_tags}
+            if "bitters" in normalized_name or "bitters" in tag_set:
+                multiplier *= max(0.1, min(1.0, bitter_cap / 0.4))
     if association_model:
+        adjusted_score = (base_score + bonus - penalty) * multiplier
         return association_model.score_ingredient(
             ingredient,
-            base_score,
+            adjusted_score,
             existing_tags=existing_tags,
             role=role,
         )
-    score = base_score
+    score = (base_score + bonus - penalty) * multiplier
     if keyword_hints:
         normalized_hints = {_normalize(hint) for hint in keyword_hints if hint}
         name_tokens = set(_tokenize(ingredient.name))
@@ -814,6 +956,9 @@ def _rank_ingredients(
     existing_tags: Optional[Sequence[str]] = None,
     role: Optional[str] = None,
     keyword_hints: Optional[Sequence[str]] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> List[Tuple[Ingredient, float]]:
     ranked = [
         (
@@ -825,6 +970,9 @@ def _rank_ingredients(
                 existing_tags=existing_tags,
                 role=role,
                 keyword_hints=keyword_hints,
+                knowledge_base=knowledge_base,
+                target_vector=target_vector,
+                plan=plan,
             ),
         )
         for ingredient in ingredients
@@ -843,6 +991,9 @@ def _select_best_match(
     existing_tags: Optional[Sequence[str]] = None,
     role: Optional[str] = None,
     keyword_hints: Optional[Sequence[str]] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> Optional[Ingredient]:
     candidates: List[Ingredient] = []
     for ingredient in ingredients:
@@ -858,6 +1009,9 @@ def _select_best_match(
         existing_tags=existing_tags,
         role=role,
         keyword_hints=keyword_hints,
+        knowledge_base=knowledge_base,
+        target_vector=target_vector,
+        plan=plan,
     )
     return ranked[0][0] if ranked else None
 
@@ -871,6 +1025,9 @@ def _select_juice_candidate(
     used_names: Set[str],
     keyword_hints: Optional[Sequence[str]] = None,
     required_keywords: Optional[Sequence[str]] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> Optional[Ingredient]:
     candidates: List[Ingredient] = []
     normalized_used = {_normalize(name) for name in used_names}
@@ -889,6 +1046,9 @@ def _select_juice_candidate(
         existing_tags=existing_tags,
         role="juice",
         keyword_hints=keyword_hints,
+        knowledge_base=knowledge_base,
+        target_vector=target_vector,
+        plan=plan,
     )
     return ranked[0][0] if ranked else None
 
@@ -901,12 +1061,33 @@ def _select_lengthener_candidate(
     existing_tags: Optional[Sequence[str]],
     used_names: Set[str],
     keyword_hints: Optional[Sequence[str]] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> Optional[Ingredient]:
-    for keyword_pool in (
-        list(_BASE_JUICE_KEYWORDS),
-        list(_SECONDARY_JUICE_KEYWORDS),
-        None,
-    ):
+    allow_carbonated = True
+    require_carbonated = False
+    preferred_exact: Sequence[str] = ()
+    if plan is not None and getattr(plan, "lengthener_rules", None):
+        allow_carbonated = plan.lengthener_rules.get("allow_carbonated", True)
+        require_carbonated = bool(plan.lengthener_rules.get("require_carbonated", False))
+        preferred = plan.lengthener_rules.get("preferred")
+        if isinstance(preferred, (list, tuple, set)):
+            preferred_exact = list(preferred)
+
+    keyword_sequences: List[Optional[Sequence[str]]] = []
+    if preferred_exact:
+        keyword_sequences.append(list(preferred_exact))
+    if plan is not None and plan.lengtheners:
+        keyword_sequences.append(list(plan.lengtheners))
+    keyword_sequences.extend(
+        [
+            list(_BASE_JUICE_KEYWORDS),
+            list(_SECONDARY_JUICE_KEYWORDS),
+            None,
+        ]
+    )
+    for keyword_pool in keyword_sequences:
         candidate = _select_juice_candidate(
             juices,
             profile,
@@ -915,8 +1096,16 @@ def _select_lengthener_candidate(
             used_names=used_names,
             keyword_hints=keyword_hints,
             required_keywords=keyword_pool,
+            knowledge_base=knowledge_base,
+            target_vector=target_vector,
+            plan=plan,
         )
         if candidate:
+            carbonated = _is_carbonated_lengthener(candidate.name)
+            if not allow_carbonated and carbonated:
+                continue
+            if require_carbonated and not carbonated:
+                continue
             return candidate
     return None
 
@@ -927,6 +1116,9 @@ def _match_base_spirit(
     base_spirit: str,
     *,
     association_model: Optional[FlavourAssociationModel] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> Optional[Ingredient]:
     target = _normalize(base_spirit)
 
@@ -942,6 +1134,9 @@ def _match_base_spirit(
         predicate=_predicate,
         association_model=association_model,
         role="base",
+        knowledge_base=knowledge_base,
+        target_vector=target_vector,
+        plan=plan,
     )
     if spirit:
         return spirit
@@ -951,6 +1146,9 @@ def _match_base_spirit(
         category="spirit",
         association_model=association_model,
         role="base",
+        knowledge_base=knowledge_base,
+        target_vector=target_vector,
+        plan=plan,
     )
 
 
@@ -1016,6 +1214,9 @@ def _select_garnish(
     association_model: Optional[FlavourAssociationModel] = None,
     existing_tags: Optional[Sequence[str]] = None,
     keyword_hints: Optional[Sequence[str]] = None,
+    knowledge_base: Optional[FlavourKnowledgeBase] = None,
+    target_vector: Optional[FlavourVector] = None,
+    plan: Optional[PreferencePlan] = None,
 ) -> Optional[Ingredient]:
     garnishes = _find_candidates_by_category(ingredients, "garnish")
     ranked = _rank_ingredients(
@@ -1025,6 +1226,9 @@ def _select_garnish(
         existing_tags=existing_tags,
         role="garnish",
         keyword_hints=keyword_hints,
+        knowledge_base=knowledge_base,
+        target_vector=target_vector,
+        plan=plan,
     )
     return ranked[0][0] if ranked else None
 
@@ -1043,6 +1247,32 @@ def _ensure_palate_balance(
 
     def _total(role: str) -> float:
         return sum(max(s.amount_ml, 0.0) for s in role_groups.get(role, []))
+
+    ratio_targets = getattr(plan, "ratio_targets", {}) or {}
+    if ratio_targets:
+        considered_roles = {role for role in ratio_targets.keys() if role in role_groups}
+        total_core = sum(_total(role) for role in considered_roles)
+        if total_core <= 0:
+            total_core = sum(_total(role) for role in ("base", "modifier", "sweetener", "juice"))
+        for role, window in ratio_targets.items():
+            items = role_groups.get(role)
+            if not items or not window:
+                continue
+            low, high = float(window[0]), float(window[1])
+            if total_core <= 0:
+                continue
+            current = _total(role)
+            target_min = max(0.0, low * total_core)
+            target_max = max(target_min + 1.0, high * total_core)
+            if current < target_min:
+                deficit = target_min - current
+                share = deficit / len(items)
+                for suggestion in items:
+                    suggestion.amount_ml += share
+            elif current > target_max and current > 0:
+                scale = target_max / current
+                for suggestion in items:
+                    suggestion.amount_ml = max(3.0, suggestion.amount_ml * scale)
 
     base_total = _total("base")
     if role_groups.get("base"):
@@ -1075,19 +1305,38 @@ def _ensure_palate_balance(
             juice_total = _total("juice")
 
     sweet_total = _total("sweetener")
+    sweet_window = getattr(plan, "sweet_acid_window", None)
     if role_groups.get("sweetener") and juice_total > 0:
-        min_sweet = max(juice_total * 0.12, 5.0)
-        max_sweet = max(juice_total * 0.6, min_sweet)
-        if sweet_total < min_sweet:
-            deficit = min_sweet - sweet_total
-            share = deficit / len(role_groups["sweetener"])
-            for suggestion in role_groups["sweetener"]:
-                suggestion.amount_ml += share
-            sweet_total = _total("sweetener")
-        elif sweet_total > max_sweet and sweet_total > 0:
-            scale = max_sweet / sweet_total
-            for suggestion in role_groups["sweetener"]:
-                suggestion.amount_ml = max(3.0, suggestion.amount_ml * scale)
+        if sweet_window:
+            low, high = float(sweet_window[0]), float(sweet_window[1])
+            if juice_total > 0:
+                ratio = sweet_total / juice_total if juice_total > 0 else float("inf")
+                if ratio < low:
+                    target = low * juice_total
+                    deficit = target - sweet_total
+                    share = deficit / len(role_groups["sweetener"])
+                    for suggestion in role_groups["sweetener"]:
+                        suggestion.amount_ml += share
+                    sweet_total = _total("sweetener")
+                elif ratio > high and sweet_total > 0:
+                    target = high * juice_total
+                    scale = target / sweet_total if sweet_total > 0 else 1.0
+                    for suggestion in role_groups["sweetener"]:
+                        suggestion.amount_ml = max(3.0, suggestion.amount_ml * scale)
+                    sweet_total = _total("sweetener")
+        else:
+            min_sweet = max(juice_total * 0.12, 5.0)
+            max_sweet = max(juice_total * 0.6, min_sweet)
+            if sweet_total < min_sweet:
+                deficit = min_sweet - sweet_total
+                share = deficit / len(role_groups["sweetener"])
+                for suggestion in role_groups["sweetener"]:
+                    suggestion.amount_ml += share
+                sweet_total = _total("sweetener")
+            elif sweet_total > max_sweet and sweet_total > 0:
+                scale = max_sweet / sweet_total
+                for suggestion in role_groups["sweetener"]:
+                    suggestion.amount_ml = max(3.0, suggestion.amount_ml * scale)
 
     modifier_total = _total("modifier")
     if role_groups.get("modifier") and base_total > 0:
@@ -1096,6 +1345,158 @@ def _ensure_palate_balance(
             scale = max_modifier / modifier_total
             for suggestion in role_groups["modifier"]:
                 suggestion.amount_ml = max(5.0, suggestion.amount_ml * scale)
+
+
+def _apply_template_guidance(
+    suggestions: Sequence[IngredientSuggestion],
+    template,
+    *,
+    knowledge: FlavourKnowledgeBase,
+    target_vector: Optional[FlavourVector] = None,
+    control_tags: Optional[Sequence[str]] = None,
+    plan: Optional[PreferencePlan] = None,
+) -> Dict[str, float]:
+    if template is None or not suggestions:
+        return {}
+
+    active_template = template
+    role_ratios = getattr(template, "role_ratios", {})
+    constraints = dict(getattr(template, "constraints", {}))
+
+    if plan is not None:
+        adjusted_ratios = dict(role_ratios)
+        if plan.ratio_targets:
+            for role, window in plan.ratio_targets.items():
+                if not window:
+                    continue
+                low, high = window
+                center = max(0.0, (float(low) + float(high)) / 2.0)
+                role_key = _normalize(role)
+                current = adjusted_ratios.get(role_key, center)
+                adjusted_ratios[role_key] = 0.7 * current + 0.3 * center
+            total = sum(adjusted_ratios.values())
+            if total > 0:
+                adjusted_ratios = {role: value / total for role, value in adjusted_ratios.items()}
+        role_ratios = adjusted_ratios
+
+        if plan.sweet_acid_window:
+            taste_targets = dict(constraints.get("taste_targets") or {})
+            taste_targets["sweet:acid_ratio"] = [float(plan.sweet_acid_window[0]), float(plan.sweet_acid_window[1])]
+            constraints["taste_targets"] = taste_targets
+        if getattr(plan, "taste_caps", None):
+            taste_caps = dict(constraints.get("taste_caps") or {})
+            for key, value in plan.taste_caps.items():
+                try:
+                    taste_caps[_normalize(key)] = float(value)
+                except (TypeError, ValueError):
+                    continue
+            if taste_caps:
+                constraints["taste_caps"] = taste_caps
+        if plan.abv_range:
+            constraints["abv_range"] = [float(plan.abv_range[0]), float(plan.abv_range[1])]
+        if plan.ingredient_max is not None:
+            constraints["ingredient_count_max"] = int(plan.ingredient_max)
+        active_template = PourTemplate(
+            id=getattr(template, "id", "template"),
+            name=getattr(template, "name", "Template"),
+            role_ratios=role_ratios,
+            constraints=constraints,
+        )
+
+    if not role_ratios:
+        return {}
+
+    role_groups: Dict[str, List[IngredientSuggestion]] = defaultdict(list)
+    for suggestion in suggestions:
+        role_groups[suggestion.role.strip().lower()].append(suggestion)
+
+    total_core = sum(
+        suggestion.amount_ml
+        for suggestion in suggestions
+        if suggestion.role.strip().lower() in role_ratios
+    )
+    if total_core <= 0:
+        total_core = 100.0
+
+    for role, ratio in role_ratios.items():
+        items = role_groups.get(role)
+        if not items:
+            continue
+        target_amount = max(0.0, ratio * total_core)
+        share = target_amount / len(items)
+        minimum = 30.0 if role == "base" else 5.0
+        for suggestion in items:
+            suggestion.amount_ml = max(minimum, share)
+
+    control_set = {(_normalize(tag)) for tag in control_tags or []}
+    if "reduce_sweet" in control_set:
+        for suggestion in role_groups.get("sweetener", []):
+            suggestion.amount_ml *= 0.85
+    if "reduce_strength" in control_set:
+        for suggestion in role_groups.get("base", []):
+            suggestion.amount_ml *= 0.9
+        for suggestion in role_groups.get("juice", []):
+            suggestion.amount_ml *= 1.05
+
+    if plan is not None and getattr(plan, "role_bounds", None):
+        core_roles = ("base", "modifier", "sweetener", "juice")
+        total_core = sum(
+            sum(s.amount_ml for s in role_groups.get(role, [])) for role in core_roles
+        )
+        if total_core <= 0:
+            total_core = sum(s.amount_ml for group in role_groups.values() for s in group)
+        if total_core > 0:
+            for role, bounds in plan.role_bounds.items():
+                items = role_groups.get(role)
+                if not items:
+                    continue
+                min_share, max_share = bounds
+                current_total = sum(s.amount_ml for s in items)
+                if min_share is not None:
+                    target_min = max(0.0, float(min_share) * total_core)
+                    if current_total < target_min:
+                        deficit = target_min - current_total
+                        share = deficit / len(items)
+                        for suggestion in items:
+                            suggestion.amount_ml += share
+                        current_total = sum(s.amount_ml for s in items)
+                if max_share is not None and current_total > 0:
+                    target_max = max(0.0, float(max_share) * total_core)
+                    if target_max < current_total:
+                        scale = target_max / current_total if current_total > 0 else 1.0
+                        for suggestion in items:
+                            suggestion.amount_ml = max(3.0, suggestion.amount_ml * scale)
+
+    ingredient_payload = [(s.ingredient, s.amount_ml) for s in suggestions]
+    issues = evaluate_template_constraints(knowledge, active_template, ingredient_payload)
+
+    if "sweetness_high" in issues and role_groups.get("sweetener"):
+        factor = max(0.6, 1.0 - issues["sweetness_high"])
+        for suggestion in role_groups["sweetener"]:
+            suggestion.amount_ml = max(4.0, suggestion.amount_ml * factor)
+    elif "sweetness_low" in issues and role_groups.get("sweetener"):
+        factor = min(1.4, 1.0 + issues["sweetness_low"])
+        for suggestion in role_groups["sweetener"]:
+            suggestion.amount_ml = max(5.0, suggestion.amount_ml * factor)
+
+    if "abv_over" in issues and role_groups.get("base") and role_groups.get("juice"):
+        base_factor = max(0.6, 1.0 - issues["abv_over"])
+        for suggestion in role_groups["base"]:
+            suggestion.amount_ml = max(25.0, suggestion.amount_ml * base_factor)
+        for suggestion in role_groups["juice"]:
+            suggestion.amount_ml *= 1.1
+    elif "abv_under" in issues and role_groups.get("base"):
+        boost = min(1.3, 1.0 + issues["abv_under"])
+        for suggestion in role_groups["base"]:
+            suggestion.amount_ml = max(30.0, suggestion.amount_ml * boost)
+
+    ingredient_payload = [(s.ingredient, s.amount_ml) for s in suggestions]
+    final_issues = evaluate_template_constraints(knowledge, active_template, ingredient_payload)
+    similarity = 0.0
+    if target_vector is not None:
+        similarity = compute_recipe_similarity(knowledge, target_vector, ingredient_payload)
+    final_issues["similarity"] = similarity
+    return final_issues
 
 
 def generate_cocktail_recipe(
@@ -1116,8 +1517,15 @@ def generate_cocktail_recipe(
 
     ingredients = repository.load_bar_stock(bar_id)
 
+    flavour_knowledge = _load_flavour_knowledge()
+    for item in ingredients:
+        flavour_knowledge.enrich_ingredient(item)
+
     plan = build_preference_plan(responses)
     profile = collect_profile_tags(responses, plan)
+    target_vector = flavour_knowledge.build_target_vector(responses, plan=plan)
+    target_tag_weights = flavour_knowledge.mapping.target_tags_from_responses(responses)
+    control_set = {_normalize(tag) for tag in target_tag_weights.keys()}
 
     avoid_terms = _extract_avoid_terms(responses.get("notes"))
     if avoid_terms:
@@ -1133,6 +1541,9 @@ def generate_cocktail_recipe(
             profile,
             responses["base_spirit"],
             association_model=association_model,
+            knowledge_base=flavour_knowledge,
+            target_vector=target_vector,
+            plan=plan,
         )
 
     if base is None:
@@ -1142,6 +1553,9 @@ def generate_cocktail_recipe(
             category="spirit",
             association_model=association_model,
             role="base",
+            knowledge_base=flavour_knowledge,
+            target_vector=target_vector,
+            plan=plan,
         )
     if base is None:
         raise ValueError("No base spirit available in the bar stock list.")
@@ -1170,6 +1584,9 @@ def generate_cocktail_recipe(
         existing_tags=existing_tags,
         role="modifier",
         keyword_hints=plan.modifier_tags,
+        knowledge_base=flavour_knowledge,
+        target_vector=target_vector,
+        plan=plan,
     )
 
     if modifiers_ranked and plan.modifier_ml > 0:
@@ -1184,6 +1601,9 @@ def generate_cocktail_recipe(
         existing_tags=existing_tags,
         role="sweetener",
         keyword_hints=plan.sweetener_tags,
+        knowledge_base=flavour_knowledge,
+        target_vector=target_vector,
+        plan=plan,
     )
 
     sweetener_added = False
@@ -1196,6 +1616,12 @@ def generate_cocktail_recipe(
     juice_hints: List[str] = [hint for hint in list(plan.juice_tags) if hint]
     if plan.juice_focus:
         juice_hints.append(plan.juice_focus)
+    for candidate in plan.candidate_pools.get("juice", ()):  # prefer persona juices
+        if candidate not in juice_hints:
+            juice_hints.append(candidate)
+    for candidate in plan.lengtheners:
+        if candidate not in juice_hints:
+            juice_hints.append(candidate)
 
     if not juices_pool:
         raise ValueError("Bar stock does not include suitable juices for this serve.")
@@ -1210,6 +1636,9 @@ def generate_cocktail_recipe(
         used_names=used_juice_names,
         keyword_hints=juice_hints,
         required_keywords=list(_BASE_JUICE_KEYWORDS),
+        knowledge_base=flavour_knowledge,
+        target_vector=target_vector,
+        plan=plan,
     )
 
     if primary_juice is None:
@@ -1246,6 +1675,9 @@ def generate_cocktail_recipe(
             used_names=used_juice_names,
             keyword_hints=juice_hints,
             required_keywords=[secondary_focus],
+            knowledge_base=flavour_knowledge,
+            target_vector=target_vector,
+            plan=plan,
         )
         if focus_candidate:
             used_juice_names.add(_normalize(focus_candidate.name))
@@ -1268,6 +1700,9 @@ def generate_cocktail_recipe(
             used_names=used_juice_names,
             keyword_hints=juice_hints,
             required_keywords=list(_BASE_JUICE_KEYWORDS),
+            knowledge_base=flavour_knowledge,
+            target_vector=target_vector,
+            plan=plan,
         )
         if additional_candidate:
             used_juice_names.add(_normalize(additional_candidate.name))
@@ -1283,6 +1718,23 @@ def generate_cocktail_recipe(
             for suggestion in suggestions:
                 suggestion.amount_ml *= scale
 
+    template_candidates = flavour_knowledge.select_templates_for_target(
+        target_vector,
+        target_tags=target_tag_weights,
+        plan=plan,
+    )
+    selected_template = template_candidates[0] if template_candidates else None
+    template_feedback = {}
+    if selected_template is not None:
+        template_feedback = _apply_template_guidance(
+            suggestions,
+            selected_template,
+            knowledge=flavour_knowledge,
+            target_vector=target_vector,
+            control_tags=control_set,
+            plan=plan,
+        )
+
     _ensure_palate_balance(suggestions, plan)
 
     existing_tags = _collect_tags(suggestions)
@@ -1294,22 +1746,29 @@ def generate_cocktail_recipe(
             plan.garnish_hint,
             category="garnish",
         )
+    garnish_hints: List[str] = []
+    if plan.garnish_hint:
+        garnish_hints.append(plan.garnish_hint)
+    garnish_hints.extend(value for value in plan.garnish_pool if value)
     if garnish_item is None:
         garnish_item = _select_garnish(
             ingredients,
             profile,
             association_model=association_model,
             existing_tags=existing_tags,
-            keyword_hints=[plan.garnish_hint] if plan.garnish_hint else None,
+            keyword_hints=garnish_hints or None,
+            knowledge_base=flavour_knowledge,
+            target_vector=target_vector,
+            plan=plan,
         )
     garnish_name = garnish_item.name if garnish_item else plan.garnish_hint
 
     glassware = plan.glass_type or _determine_glassware(responses)
-    ice = _determine_ice(responses)
+    ice = plan.ice_program or _determine_ice(responses)
 
     total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)
     top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
-    if top_up_needed > 15:
+    if top_up_needed > 15 and (plan.lengthener_allowed is not False):
         candidate = _select_lengthener_candidate(
             juices_pool,
             profile,
@@ -1317,6 +1776,9 @@ def generate_cocktail_recipe(
             existing_tags=existing_tags,
             used_names=used_juice_names,
             keyword_hints=juice_hints,
+            knowledge_base=flavour_knowledge,
+            target_vector=target_vector,
+            plan=plan,
         )
         if candidate:
             used_juice_names.add(_normalize(candidate.name))
@@ -1329,16 +1791,47 @@ def generate_cocktail_recipe(
             top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
 
     lengthener_note = None
-    if top_up_needed > 15:
+    if top_up_needed > 15 and (plan.lengthener_allowed is not False):
         fallback_name = primary_juice_name
         if not fallback_name and plan.juice_focus:
             focus = plan.juice_focus.strip()
             fallback_name = focus if "juice" in focus.lower() else f"{focus} juice"
+        if not fallback_name and getattr(plan, "lengthener_rules", None):
+            preferred = plan.lengthener_rules.get("preferred")
+            if preferred:
+                fallback_name = str(preferred[0])
         if not fallback_name:
             fallback_name = "seasonal juice"
         lengthener_note = (
             f"Top up with {top_up_needed:.0f} ml chilled {fallback_name.lower()} to finish the serve."
         )
+
+    final_payload = [(s.ingredient, s.amount_ml) for s in suggestions if s.amount_ml > 0]
+    final_similarity = compute_recipe_similarity(
+        flavour_knowledge,
+        target_vector,
+        final_payload,
+    )
+    if selected_template is not None:
+        template_feedback["similarity"] = final_similarity
+
+    explanations: List[str] = []
+    if getattr(plan, "explanations", None):
+        explanations.extend(plan.explanations)
+    if selected_template is not None:
+        explanations.append(
+            f"Applied {selected_template.name} template to keep base/modifier/juice ratios bartender friendly."
+        )
+    if final_similarity:
+        explanations.append(f"Flavour alignment score: {final_similarity:.2f} (cosine match).")
+    if "reduce_sweet" in control_set:
+        explanations.append("Sweetness tempered in line with guest notes.")
+    if "reduce_strength" in control_set:
+        explanations.append("ABV moderated for a lighter sipping profile.")
+    if plan.juice_focus:
+        explanations.append(f"Juice emphasis: {plan.juice_focus.title()} leads the palate.")
+    if lengthener_note:
+        explanations.append("Lengthener guidance included to reach glass volume without diluting balance.")
 
     steps = _build_steps(recipe_name, suggestions, glassware, ice, garnish_name, lengthener_note)
 
@@ -1353,6 +1846,7 @@ def generate_cocktail_recipe(
         garnish=garnish_name,
         flavour_profile=sorted_profile,
         notes=responses.get("notes"),
+        explanations=explanations,
     )
 
 

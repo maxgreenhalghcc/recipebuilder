@@ -177,7 +177,7 @@ def build_observations_from_samples(
         observation = sample.to_observation(rating_floor=rating_floor)
         if observation is not None:
             observations.append(observation)
-    return observations
+        return observations
 
 
 def train_model_from_samples(
@@ -260,3 +260,104 @@ def load_model_weights(path: Path | str) -> FlavourAssociationModel:
     with file_path.open("r", encoding="utf-8") as handle:
         raw = json.load(handle)
     return FlavourAssociationModel.from_weights(raw)
+
+
+@dataclass
+class HumanAdjectiveTrainingSample:
+    """Links human adjectives to template and role decisions."""
+
+    adjectives: Sequence[str]
+    target_template: str
+    recommended_roles: Dict[str, str]
+    ratio_hint: Dict[str, float]
+    success_score: float
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, object]) -> "HumanAdjectiveTrainingSample":
+        adjectives = _ensure_list(data.get("adjectives") or [])
+        template = str(data.get("target_template") or "").strip()
+        if not template:
+            raise ValueError("Adjective samples require a 'target_template'.")
+        ratio_hint_raw = data.get("ratio_hint") or {}
+        ratio_hint: Dict[str, float] = {}
+        if isinstance(ratio_hint_raw, Dict):
+            for role, value in ratio_hint_raw.items():
+                try:
+                    ratio_hint[_normalize(role)] = float(value)
+                except (TypeError, ValueError):
+                    continue
+        recommended_raw = data.get("recommended_roles") or {}
+        recommended: Dict[str, str] = {}
+        if isinstance(recommended_raw, Dict):
+            for role, ingredient in recommended_raw.items():
+                if ingredient:
+                    recommended[_normalize(role)] = str(ingredient)
+        success = float(data.get("success_score", 1.0))
+        return cls(
+            adjectives=adjectives,
+            target_template=template,
+            recommended_roles=recommended,
+            ratio_hint=ratio_hint,
+            success_score=success,
+        )
+
+
+def load_human_adjective_training(path: Path | str) -> List[HumanAdjectiveTrainingSample]:
+    """Load human adjective training samples from JSON."""
+
+    file_path = Path(path)
+    if not file_path.exists():
+        raise FileNotFoundError(f"Adjective training data not found at {file_path!s}.")
+    with file_path.open("r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+    samples: List[HumanAdjectiveTrainingSample] = []
+    for entry in _iter_sample_payloads(raw):
+        samples.append(HumanAdjectiveTrainingSample.from_dict(entry))
+    return samples
+
+
+def build_adjective_preference_matrix(
+    samples: Sequence[HumanAdjectiveTrainingSample],
+) -> Dict[str, Dict[str, Dict[str, float]]]:
+    """Convert adjective-driven samples into template and role preference matrices."""
+
+    matrix: Dict[str, Dict[str, Dict[str, float]]] = {
+        "templates": {},
+        "adjectives": {},
+    }
+    for sample in samples:
+        weight = max(0.0, float(sample.success_score))
+        template_key = _normalize(sample.target_template)
+        template_entry = matrix["templates"].setdefault(
+            template_key, {"weight": 0.0, "ratios": {}}
+        )
+        template_entry["weight"] += weight
+        for role, ratio in sample.ratio_hint.items():
+            template_entry.setdefault("ratios", {})[role] = template_entry["ratios"].get(role, 0.0) + ratio * weight
+        for adjective in sample.adjectives:
+            adjective_key = _normalize(adjective)
+            if not adjective_key:
+                continue
+            adjective_entry = matrix["adjectives"].setdefault(
+                adjective_key,
+                {"templates": {}, "ratios": {}, "roles": {}},
+            )
+            adjective_entry["templates"][template_key] = (
+                adjective_entry["templates"].get(template_key, 0.0) + weight
+            )
+            for role, ratio in sample.ratio_hint.items():
+                adjective_entry["ratios"][role] = adjective_entry["ratios"].get(role, 0.0) + ratio * weight
+            for role in sample.recommended_roles.keys():
+                adjective_entry["roles"][role] = adjective_entry["roles"].get(role, 0.0) + weight
+
+    for template_key, info in matrix["templates"].items():
+        weight = info.get("weight", 0.0) or 1.0
+        ratios = info.get("ratios", {})
+        info["ratios"] = {role: value / weight for role, value in ratios.items() if weight}
+
+    for adjective_key, info in matrix["adjectives"].items():
+        template_weights = info.get("templates", {})
+        total_weight = sum(template_weights.values()) or 1.0
+        ratios = info.get("ratios", {})
+        info["ratios"] = {role: value / total_weight for role, value in ratios.items() if total_weight}
+    return matrix

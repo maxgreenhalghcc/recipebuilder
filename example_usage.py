@@ -33,6 +33,13 @@ if __name__ == "__main__":
         "house_type": "modern house",
         "dining_style": "refreshing and vibrant flavours which awaken my senses",
         "music_preference": "jazz/blues",
+        "sweetener_question": "floral",
+        "bitterness_tolerance": "medium",
+        "carbonation_texture": "lightly fizzy",
+        "abv_lane": "medium",
+        "allergens": "",
+        "foam_toggle": "yes",
+        "aroma_preference": "citrus",
         "modifier_question": "emerald",
         "sweetener_question": "floral",
         "aroma_preference": "citrus",
@@ -61,3 +68,8 @@ if __name__ == "__main__":
     print("\nFlavour profile weighting:")
     for flavour, weight in recipe.flavour_profile:
         print(f"  {flavour}: {weight:.2f}")
+
+    if recipe.explanations:
+        print("\nModel reasoning:")
+        for line in recipe.explanations:
+            print(f"  - {line}")

@@ -1,0 +1,40 @@
+{
+  "samples": [
+    {
+      "adjectives": ["refreshing", "citrus", "light"],
+      "target_template": "tpl_shaken_sour",
+      "recommended_roles": {
+        "base": "gin",
+        "juice": "lime juice",
+        "sweetener": "simple syrup",
+        "modifier": "elderflower syrup"
+      },
+      "ratio_hint": {"base": 0.45, "modifier": 0.15, "sweetener": 0.15, "juice": 0.25},
+      "success_score": 0.92
+    },
+    {
+      "adjectives": ["tropical", "sweet", "indulgent"],
+      "target_template": "tpl_highball",
+      "recommended_roles": {
+        "base": "rum",
+        "juice": "pineapple juice",
+        "sweetener": "vanilla syrup",
+        "modifier": "passoa"
+      },
+      "ratio_hint": {"base": 0.35, "modifier": 0.2, "sweetener": 0.15, "juice": 0.3},
+      "success_score": 0.88
+    },
+    {
+      "adjectives": ["bold", "spice", "indulgent"],
+      "target_template": "tpl_collins",
+      "recommended_roles": {
+        "base": "bourbon",
+        "juice": "orange juice",
+        "sweetener": "maple syrup",
+        "modifier": "bitters"
+      },
+      "ratio_hint": {"base": 0.5, "modifier": 0.15, "sweetener": 0.15, "juice": 0.2},
+      "success_score": 0.84
+    }
+  ]
+}
