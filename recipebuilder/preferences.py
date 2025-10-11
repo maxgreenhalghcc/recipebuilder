@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple, List, Set
 import json
 
 OZ_TO_ML = 29.5735
@@ -41,7 +41,9 @@ _DINING_PROFILES = _load_profile_map("dining_profiles.json")
 _MUSIC_PROFILES = _load_profile_map("music_profiles.json")
 _AROMA_PROFILES = _load_profile_map("aroma_profiles.json")
 _DESSERT_PROFILES = _load_profile_map("dessert_profiles.json")
-_COLOUR_PROFILES = _load_profile_map("colour_profiles.json")
+_BITTERNESS_PROFILES = _load_profile_map("bitterness_profiles.json")
+_CARBONATION_PROFILES = _load_profile_map("carbonation_profiles.json")
+_ABV_PROFILES = _load_profile_map("abv_profiles.json")
 _SWEETENER_STYLES = _load_profile_map("sweetener_styles.json")
 
 _STRENGTH_SCALE = {
@@ -65,6 +67,113 @@ _BASE_JUICE_PRIORITY = (
     "orange juice",
     "cranberry juice",
 )
+
+
+_ALLERGEN_RULES: Sequence[Mapping[str, object]] = (
+    {
+        "tokens": {"coconut"},
+        "phrases": ["no coconut"],
+        "avoid": ["coconut", "malibu", "coconut-cream"],
+        "tag": "avoid-coconut",
+        "explain": "Allergen/caveat: coconut → exclude coconut spirits/creams.",
+    },
+    {
+        "tokens": {"nut", "nuts"},
+        "phrases": ["allergic to nuts", "no nuts"],
+        "avoid": ["nut", "amaretto", "orgeat", "hazelnut"],
+        "tag": "avoid-nut",
+        "explain": "Allergen: nuts → exclude amaretto/orgeat/nut liqueurs.",
+    },
+    {
+        "tokens": {"dairy", "cream"},
+        "phrases": ["no dairy", "no cream"],
+        "avoid": ["cream", "milk", "irish-cream", "dairy"],
+        "tag": "avoid-dairy",
+        "explain": "Allergen: dairy → exclude cream-based modifiers.",
+    },
+    {
+        "tokens": {"egg", "egg white", "foam"},
+        "phrases": ["no egg", "no foam"],
+        "avoid": ["egg white", "aquafaba"],
+        "tag": "no-foam",
+        "explain": "Preference: no foam → exclude egg/aquafaba.",
+    },
+    {
+        "tokens": {"coffee", "caffeine"},
+        "phrases": ["no coffee", "no caffeine"],
+        "avoid": ["coffee", "cold brew", "espresso", "caffeinated"],
+        "tag": "avoid-caffeine",
+        "explain": "Caffeine sensitive → exclude coffee/caffeinated liqueurs.",
+    },
+    {
+        "tokens": {"pineapple"},
+        "phrases": [],
+        "avoid": ["pineapple"],
+        "tag": "avoid-pineapple",
+        "explain": "Exclude pineapple by request.",
+    },
+    {
+        "tokens": {"grapefruit"},
+        "phrases": [],
+        "avoid": ["grapefruit"],
+        "tag": "avoid-grapefruit",
+        "explain": "Exclude grapefruit oils/juice/peel.",
+    },
+    {
+        "tokens": {"anise", "anis"},
+        "phrases": [],
+        "avoid": ["sambuca", "ouzo", "pastis", "anisette", "anise"],
+        "tag": "avoid-anise",
+        "explain": "Exclude anise spirits per preference.",
+    },
+)
+
+
+def _tokenise_values(value: object) -> Set[str]:
+    tokens: Set[str] = set()
+    if value is None:
+        return tokens
+    if isinstance(value, str):
+        working = value.replace(";", ",")
+        parts = [segment.strip() for segment in working.split(",") if segment.strip()]
+    elif isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
+        parts = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        parts = [str(value).strip()]
+    for part in parts:
+        normalized = _normalize(part)
+        if normalized:
+            tokens.add(normalized)
+    return tokens
+
+
+def _apply_allergen_rules(
+    responses: Mapping[str, Optional[str]],
+    avoid_terms: Set[str],
+    tag_weights: Dict[str, float],
+) -> List[str]:
+    tokens = _tokenise_values(responses.get("allergens"))
+    notes_text = (responses.get("notes") or "").lower()
+    explanations: List[str] = []
+    for rule in _ALLERGEN_RULES:
+        rule_tokens = {str(token) for token in rule.get("tokens", set())}
+        phrases = [str(phrase) for phrase in rule.get("phrases", [])]
+        triggered = any(_normalize(token) in tokens for token in rule_tokens)
+        if not triggered:
+            triggered = any(phrase in notes_text for phrase in phrases if phrase)
+        if not triggered:
+            continue
+        for term in rule.get("avoid", []):
+            normalized = _normalize(str(term))
+            if normalized:
+                avoid_terms.add(normalized)
+        tag = rule.get("tag")
+        if tag:
+            tag_weights[_normalize(str(tag))] += 1.0
+        explanation = rule.get("explain")
+        if isinstance(explanation, str) and explanation.strip():
+            explanations.append(explanation.strip())
+    return explanations
 
 
 @dataclass
@@ -106,6 +215,13 @@ class PreferencePlan:
     ingredient_max: Optional[int] = None
     ice_program: Optional[str] = None
     bitterness_tolerance: Optional[float] = None
+    candidate_family_bias: Dict[str, float] = field(default_factory=dict)
+    candidate_item_bias: Dict[str, float] = field(default_factory=dict)
+    taste_caps: Dict[str, float] = field(default_factory=dict)
+    role_bounds: Dict[str, Tuple[Optional[float], Optional[float]]] = field(default_factory=dict)
+    lengthener_rules: Dict[str, object] = field(default_factory=dict)
+    explanations: Sequence[str] = field(default_factory=tuple)
+    learning_hooks: Sequence[str] = field(default_factory=tuple)
 
     @property
     def base_ml(self) -> float:
@@ -198,8 +314,10 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     music_key = _normalize(responses.get("music_preference") or "")
     aroma_key = _normalize(responses.get("aroma_preference") or "")
     dessert_key = _normalize(responses.get("favourite_dessert") or "")
-    colour_key = _normalize(responses.get("modifier_question") or "")
     sweetener_key = _normalize(responses.get("sweetener_question") or "")
+    bitterness_key = _normalize(responses.get("bitterness_tolerance") or "")
+    carbonation_key = _normalize(responses.get("carbonation_texture") or "")
+    abv_key = _normalize(responses.get("abv_lane") or "")
 
     profiles = [
         _SEASON_PROFILES.get(season_key, {}),
@@ -208,7 +326,9 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         _MUSIC_PROFILES.get(music_key, {}),
         _AROMA_PROFILES.get(aroma_key, {}),
         _DESSERT_PROFILES.get(dessert_key, {}),
-        _COLOUR_PROFILES.get(colour_key, {}),
+        _BITTERNESS_PROFILES.get(bitterness_key, {}),
+        _CARBONATION_PROFILES.get(carbonation_key, {}),
+        _ABV_PROFILES.get(abv_key, {}),
         _SWEETENER_STYLES.get(sweetener_key, {}),
     ]
 
@@ -234,6 +354,15 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     ingredient_caps: list[int] = []
     ice_programs: list[str] = []
     bitterness_levels: list[float] = []
+    taste_caps: Dict[str, float] = {}
+    candidate_family_bias: Dict[str, float] = {}
+    candidate_item_bias: Dict[str, float] = {}
+    role_min_bounds: Dict[str, float] = {}
+    role_max_bounds: Dict[str, float] = {}
+    lengthener_rule_flags: Dict[str, object] = {}
+    preferred_lengtheners: Set[str] = set()
+    explanations: List[str] = []
+    learning_hooks: Set[str] = set()
 
     for profile in profiles:
         if not profile:
@@ -270,6 +399,14 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         preferred_templates = profile.get("preferred_templates") or {}
         if isinstance(preferred_templates, Mapping):
             for template_id, weight in preferred_templates.items():
+                try:
+                    template_weights[_normalize(template_id)] += float(weight)
+                except (TypeError, ValueError):
+                    continue
+
+        template_bias = profile.get("template_bias") or {}
+        if isinstance(template_bias, Mapping):
+            for template_id, weight in template_bias.items():
                 try:
                     template_weights[_normalize(template_id)] += float(weight)
                 except (TypeError, ValueError):
@@ -315,6 +452,81 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
                 bitterness_levels.append(float(profile["bitterness_tolerance"]))
             except (TypeError, ValueError):
                 pass
+
+        cap_map = profile.get("taste_caps") or {}
+        if isinstance(cap_map, Mapping):
+            for cap_key, cap_value in cap_map.items():
+                normalized_key = _normalize(str(cap_key)).replace("_max", "")
+                try:
+                    numeric = float(cap_value)
+                except (TypeError, ValueError):
+                    continue
+                existing = taste_caps.get(normalized_key)
+                if existing is None or numeric < existing:
+                    taste_caps[normalized_key] = numeric
+
+        candidate_bias_map = profile.get("candidate_bias") or {}
+        if isinstance(candidate_bias_map, Mapping):
+            family_bias = candidate_bias_map.get("families") or {}
+            if isinstance(family_bias, Mapping):
+                for family, weight in family_bias.items():
+                    try:
+                        numeric = float(weight)
+                    except (TypeError, ValueError):
+                        continue
+                    key = _normalize(str(family))
+                    current = candidate_family_bias.get(key, 1.0)
+                    candidate_family_bias[key] = current * numeric
+            item_bias = candidate_bias_map.get("items") or {}
+            if isinstance(item_bias, Mapping):
+                for item, weight in item_bias.items():
+                    try:
+                        numeric = float(weight)
+                    except (TypeError, ValueError):
+                        continue
+                    key = _normalize(str(item))
+                    current = candidate_item_bias.get(key, 1.0)
+                    candidate_item_bias[key] = current * numeric
+
+        role_bounds = profile.get("role_bounds") or {}
+        if isinstance(role_bounds, Mapping):
+            for bound_key, bound_value in role_bounds.items():
+                normalized = _normalize(str(bound_key))
+                try:
+                    numeric = float(bound_value)
+                except (TypeError, ValueError):
+                    continue
+                if normalized.endswith("_min"):
+                    role = normalized[:-4]
+                    role_min_bounds[role] = max(role_min_bounds.get(role, 0.0), numeric)
+                elif normalized.endswith("_max"):
+                    role = normalized[:-4]
+                    current = role_max_bounds.get(role)
+                    role_max_bounds[role] = numeric if current is None else min(current, numeric)
+
+        lengthener_rules = profile.get("lengthener_rules")
+        if isinstance(lengthener_rules, Mapping):
+            if "allow_carbonated" in lengthener_rules:
+                lengthener_rule_flags["allow_carbonated"] = bool(lengthener_rules.get("allow_carbonated"))
+            if "require_carbonated" in lengthener_rules:
+                lengthener_rule_flags["require_carbonated"] = bool(lengthener_rules.get("require_carbonated"))
+            preferred = lengthener_rules.get("preferred")
+            if isinstance(preferred, Sequence):
+                for value in preferred:
+                    cleaned = str(value).strip()
+                    if cleaned:
+                        preferred_lengtheners.add(cleaned)
+                        lengtheners.add(cleaned)
+
+        explain_text = profile.get("explain")
+        if isinstance(explain_text, str) and explain_text.strip():
+            explanations.append(explain_text.strip())
+
+        hooks = profile.get("learning_hooks")
+        if isinstance(hooks, Sequence):
+            for hook in hooks:
+                if isinstance(hook, str) and hook.strip():
+                    learning_hooks.add(hook.strip())
 
         constraints = profile.get("constraints")
         if isinstance(constraints, Mapping):
@@ -371,6 +583,18 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
             break
     if not juice_focus and aggregated_juices:
         juice_focus = aggregated_juices[0]
+
+    explanations.extend(_apply_allergen_rules(responses, avoid_set, tag_weights))
+
+    foam_toggle = _normalize(responses.get("foam_toggle") or "")
+    if foam_toggle == "no":
+        avoid_set.update({"egg white", "aquafaba"})
+        tag_weights["no-foam"] += 1.0
+        explanations.append("Foam disabled → exclude egg white/aquafaba.")
+    elif foam_toggle == "yes":
+        tag_weights["foam-ok"] += 1.0
+        candidate_family_bias["foam"] = candidate_family_bias.get("foam", 1.0) * 1.1
+        explanations.append("Foam OK → allow silky head on sours/highballs.")
 
     sweet_acid_window = _compute_average_window(sweet_acid_windows)
     for shift in sweet_acid_shifts:
@@ -440,6 +664,37 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     if bitterness_levels:
         bitterness_tolerance = sum(bitterness_levels) / len(bitterness_levels)
 
+    candidate_family_bias = {
+        key: value for key, value in candidate_family_bias.items() if abs(value - 1.0) > 1e-6
+    }
+    candidate_item_bias = {
+        key: value for key, value in candidate_item_bias.items() if abs(value - 1.0) > 1e-6
+    }
+
+    role_bounds_final: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+    for role in set(role_min_bounds) | set(role_max_bounds):
+        min_value = role_min_bounds.get(role)
+        max_value = role_max_bounds.get(role)
+        role_bounds_final[role] = (
+            float(min_value) if min_value is not None else None,
+            float(max_value) if max_value is not None else None,
+        )
+
+    lengthener_policy: Dict[str, object] = {}
+    if "allow_carbonated" in lengthener_rule_flags:
+        lengthener_policy["allow_carbonated"] = bool(lengthener_rule_flags["allow_carbonated"])
+    if "require_carbonated" in lengthener_rule_flags:
+        lengthener_policy["require_carbonated"] = bool(lengthener_rule_flags["require_carbonated"])
+    if preferred_lengtheners:
+        lengthener_policy["preferred"] = tuple(sorted(preferred_lengtheners))
+
+    lengthener_allowed = sparkle_allowed
+    if lengthener_policy.get("allow_carbonated") is False:
+        lengthener_allowed = False
+    if lengthener_policy.get("require_carbonated"):
+        if lengthener_allowed is not False:
+            lengthener_allowed = True
+
     return PreferencePlan(
         strength_oz=strength_oz,
         modifier_oz=modifier_oz,
@@ -467,11 +722,18 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         lengtheners=lengthener_pool,
         sparkle_bias=sparkle_bias,
         sparkle_allowed=sparkle_allowed,
-        lengthener_allowed=sparkle_allowed if sparkle_allowed is not None else None,
+        lengthener_allowed=lengthener_allowed,
         abv_range=abv_range,
         ingredient_max=ingredient_max,
         ice_program=ice_program,
         bitterness_tolerance=bitterness_tolerance,
+        candidate_family_bias=candidate_family_bias,
+        candidate_item_bias=candidate_item_bias,
+        taste_caps=dict(taste_caps),
+        role_bounds=role_bounds_final,
+        lengthener_rules=lengthener_policy,
+        explanations=tuple(explanations) if explanations else tuple(),
+        learning_hooks=tuple(sorted(learning_hooks)) if learning_hooks else tuple(),
     )
 
 

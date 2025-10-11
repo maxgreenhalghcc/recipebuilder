@@ -24,9 +24,12 @@ def sample_responses():
         "music_preference": "pop",
         "aroma_preference": "citrus",
         "favourite_dessert": "tangfastics",
-        "modifier_question": "citrus yellow",
         "sweetener_question": "zesty",
+        "bitterness_tolerance": "medium",
+        "carbonation_texture": "lightly fizzy",
+        "abv_lane": "low",
         "base_spirit": "rum",
+        "foam_toggle": "yes",
     }
 
 
@@ -35,8 +38,8 @@ def test_preference_plan_combines_ratio_targets_and_windows(sample_responses):
 
     assert plan.sweet_acid_window is not None
     low, high = plan.sweet_acid_window
-    assert 0.54 < low < 0.58
-    assert 0.78 < high < 0.82
+    assert 0.54 < low < 0.59
+    assert 0.78 < high < 0.83
 
     assert "base" in plan.ratio_targets
     base_low, base_high = plan.ratio_targets["base"]
@@ -45,6 +48,12 @@ def test_preference_plan_combines_ratio_targets_and_windows(sample_responses):
 
     assert plan.candidate_pools["juice"]
     assert any("pineapple" in value.lower() for value in plan.candidate_pools["juice"])
+
+    assert plan.lengthener_rules.get("allow_carbonated") is True
+    assert plan.role_bounds["juice"][0] >= 0.28
+    assert math.isclose(plan.role_bounds["base"][1], 0.38, rel_tol=0.05)
+    assert plan.taste_caps["bitter"] == pytest.approx(0.35, rel=1e-3)
+    assert plan.candidate_item_bias.get("soda water") and plan.candidate_family_bias.get("foam")
 
 
 def test_collect_profile_tags_includes_biases(sample_responses):

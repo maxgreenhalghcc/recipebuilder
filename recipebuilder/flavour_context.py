@@ -620,5 +620,17 @@ def evaluate_template_constraints(
             elif ratio > high:
                 results["sweetness_high"] = ratio - high
 
+    taste_caps = constraints.get("taste_caps") or {}
+    if isinstance(taste_caps, Mapping):
+        for taste_key, limit in taste_caps.items():
+            try:
+                threshold = float(limit)
+            except (TypeError, ValueError):
+                continue
+            normalized = _normalize(str(taste_key))
+            current = recipe_vector.taste.get(normalized, recipe_vector.taste.get(str(taste_key), 0.0))
+            if current > threshold:
+                results[f"{normalized}_over"] = current - threshold
+
     return results
 
