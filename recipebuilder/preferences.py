@@ -352,6 +352,8 @@ class PreferencePlan:
 
     juice_min_count: int = 1
     juice_max_count: int = 2
+    juice_strategy: Optional[str] = None
+    lengthener_preference: Optional[str] = None
 
     modifier_tags: Sequence[str] = field(default_factory=tuple)
     sweetener_tags: Sequence[str] = field(default_factory=tuple)
@@ -529,6 +531,9 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     role_max_bounds: Dict[str, float] = {}
     lengthener_rule_flags: Dict[str, object] = {}
     preferred_lengtheners: Set[str] = set()
+    juice_strategy_votes: Dict[str, float] = defaultdict(float)
+    juice_max_overrides: list[Tuple[float, float]] = []
+    lengthener_preference_votes: Dict[str, float] = defaultdict(float)
     explanations: List[str] = []
     learning_hooks: Set[str] = set()
 
@@ -665,6 +670,36 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
                     current = candidate_item_bias.get(key, 1.0)
                     numeric = numeric ** max(profile_weight, 0.0) if numeric > 0 else 1.0
                     candidate_item_bias[key] = current * numeric
+
+        juice_strategy = profile.get("juice_strategy")
+        if isinstance(juice_strategy, Mapping):
+            style = juice_strategy.get("style")
+            if isinstance(style, str) and style.strip():
+                juice_strategy_votes[_normalize(style)] += profile_weight
+            max_unique = juice_strategy.get("max_unique")
+            if max_unique is not None:
+                try:
+                    numeric_max = float(max_unique)
+                except (TypeError, ValueError):
+                    numeric_max = None
+                if numeric_max is not None and numeric_max > 0:
+                    juice_max_overrides.append((numeric_max, profile_weight))
+            preference = juice_strategy.get("lengthener_preference")
+            if isinstance(preference, str) and preference.strip():
+                lengthener_preference_votes[_normalize(preference)] += profile_weight
+            additional = juice_strategy.get("preferred_lengtheners")
+            if isinstance(additional, Sequence):
+                for value in additional:
+                    cleaned = str(value).strip()
+                    if cleaned:
+                        preferred_lengtheners.add(cleaned)
+                        lengtheners.add(cleaned)
+        elif isinstance(juice_strategy, str) and juice_strategy.strip():
+            juice_strategy_votes[_normalize(juice_strategy)] += profile_weight
+
+        lengthener_preference = profile.get("lengthener_preference")
+        if isinstance(lengthener_preference, str) and lengthener_preference.strip():
+            lengthener_preference_votes[_normalize(lengthener_preference)] += profile_weight
 
         role_bounds = profile.get("role_bounds") or {}
         if isinstance(role_bounds, Mapping):
@@ -866,6 +901,25 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
     if template_weights:
         dominant_template = max(template_weights.items(), key=lambda item: item[1])[0]
 
+    juice_strategy_choice: Optional[str] = None
+    if juice_strategy_votes:
+        juice_strategy_choice = max(juice_strategy_votes.items(), key=lambda item: item[1])[0]
+
+    lengthener_preference_choice: Optional[str] = None
+    if lengthener_preference_votes:
+        lengthener_preference_choice = max(lengthener_preference_votes.items(), key=lambda item: item[1])[0]
+
+    juice_max_override: Optional[int] = None
+    if juice_max_overrides:
+        positive = [(value, weight) for value, weight in juice_max_overrides if value > 0]
+        if positive:
+            total_weight = sum(weight for _, weight in positive if weight > 0)
+            if total_weight > 0:
+                averaged = sum(value * weight for value, weight in positive) / total_weight
+            else:
+                averaged = sum(value for value, _ in positive) / len(positive)
+            juice_max_override = max(1, int(round(averaged)))
+
     base_sweet_min = 0.10
     base_sweet_max = 0.22
     if dominant_template == "tpl_martini_style":
@@ -895,13 +949,16 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
             lengthener_allowed = True
 
     juice_min_count = 1
-    juice_max_count = 2
+    if juice_max_override is not None:
+        juice_max_count = max(juice_min_count, juice_max_override)
+    else:
+        juice_max_count = 2
     if glass_min_ml and glass_min_ml <= 180:
-        juice_max_count = 1
+        juice_max_count = min(juice_max_count, 1)
     if dominant_template == "tpl_martini_style":
         juice_max_count = 1
     elif glass_min_ml and glass_min_ml >= 320:
-        juice_max_count = max(juice_max_count, 3 if lengthener_allowed else 2)
+        juice_max_count = max(juice_max_count, 3 if lengthener_allowed else max(juice_max_count, 2))
     if lengthener_policy.get("require_carbonated"):
         juice_max_count = max(juice_max_count, 3)
 
@@ -946,6 +1003,8 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         learning_hooks=tuple(sorted(learning_hooks)) if learning_hooks else tuple(),
         juice_min_count=juice_min_count,
         juice_max_count=juice_max_count,
+        juice_strategy=juice_strategy_choice,
+        lengthener_preference=lengthener_preference_choice,
     )
 
 

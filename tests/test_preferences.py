@@ -56,6 +56,8 @@ def test_preference_plan_combines_ratio_targets_and_windows(sample_responses):
     assert math.isclose(sweet_max, 0.22, rel_tol=0.1)
     assert plan.taste_caps["bitter"] == pytest.approx(0.35, rel=1e-3)
     assert plan.candidate_item_bias.get("soda water") and plan.candidate_family_bias.get("foam")
+    assert plan.juice_strategy == "lemonade_combo"
+    assert plan.lengthener_preference == "lemonade_combo"
 
 
 def test_collect_profile_tags_includes_biases(sample_responses):

@@ -1076,6 +1076,42 @@ def _select_lengthener_candidate(
             preferred_exact = list(preferred)
 
     keyword_sequences: List[Optional[Sequence[str]]] = []
+    priority_sequences: List[Sequence[str]] = []
+
+    def _append_priority(sequence: Sequence[str]) -> None:
+        if sequence and sequence not in priority_sequences:
+            priority_sequences.append(sequence)
+
+    strategy = getattr(plan, "juice_strategy", None) if plan is not None else None
+    preference_flag = getattr(plan, "lengthener_preference", None) if plan is not None else None
+
+    def _normalize_flag(value: Optional[str]) -> Optional[str]:
+        if isinstance(value, str) and value.strip():
+            return _normalize(value)
+        return None
+
+    normalized_strategy = _normalize_flag(strategy)
+    normalized_preference = _normalize_flag(preference_flag)
+
+    def _has_flag(*flags: str) -> bool:
+        return any(flag in {normalized_strategy, normalized_preference} for flag in flags)
+
+    if _has_flag("juice_only"):
+        for ingredient in juices:
+            normalized_name = _normalize(ingredient.name)
+            if normalized_name in used_names:
+                _append_priority([ingredient.name])
+
+    if _has_flag("lemonade_combo"):
+        for value in ("lemonade", "cloudy lemonade", "sparkling lemonade"):
+            _append_priority([value])
+
+    if _has_flag("sparkling_lengthener", "sparkling_core"):
+        for value in ("soda water", "lemonade", "tonic water"):
+            _append_priority([value])
+
+    if priority_sequences:
+        keyword_sequences.extend(priority_sequences)
     if preferred_exact:
         keyword_sequences.append(list(preferred_exact))
     if plan is not None and plan.lengtheners:
