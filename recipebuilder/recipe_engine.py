@@ -1166,6 +1166,16 @@ def _collect_tags(suggestions: Sequence[IngredientSuggestion]) -> List[str]:
     return tags
 
 
+def _count_unique_juices(suggestions: Sequence[IngredientSuggestion]) -> int:
+    return len(
+        {
+            _normalize(suggestion.ingredient.name)
+            for suggestion in suggestions
+            if suggestion.role == "juice"
+        }
+    )
+
+
 def _default_amount(category: str, ingredient: Ingredient, role: str) -> float:
     category = _normalize(category)
     if ingredient.default_measure_ml:
@@ -1627,6 +1637,7 @@ def generate_cocktail_recipe(
         raise ValueError("Bar stock does not include suitable juices for this serve.")
 
     used_juice_names: Set[str] = set()
+    max_juices = getattr(plan, "juice_max_count", 3)
 
     primary_juice = _select_juice_candidate(
         juices_pool,
@@ -1666,7 +1677,11 @@ def generate_cocktail_recipe(
         existing_tags = _collect_tags(suggestions)
 
     secondary_focus = plan.juice_focus or ""
-    if secondary_focus and not _ingredient_matches_keywords(primary_juice, [secondary_focus]):
+    if (
+        secondary_focus
+        and not _ingredient_matches_keywords(primary_juice, [secondary_focus])
+        and _count_unique_juices(suggestions) < max_juices
+    ):
         focus_candidate = _select_juice_candidate(
             juices_pool,
             profile,
@@ -1691,7 +1706,7 @@ def generate_cocktail_recipe(
     except (TypeError, ValueError):
         glass_min = 0.0
 
-    if glass_min and glass_min >= 240:
+    if glass_min and glass_min >= 240 and _count_unique_juices(suggestions) < max_juices:
         additional_candidate = _select_juice_candidate(
             juices_pool,
             profile,
@@ -1768,23 +1783,41 @@ def generate_cocktail_recipe(
 
     total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)
     top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
+    lengthener_rules = getattr(plan, "lengthener_rules", {}) or {}
     if top_up_needed > 15 and (plan.lengthener_allowed is not False):
-        candidate = _select_lengthener_candidate(
-            juices_pool,
-            profile,
-            association_model=association_model,
-            existing_tags=existing_tags,
-            used_names=used_juice_names,
-            keyword_hints=juice_hints,
-            knowledge_base=flavour_knowledge,
-            target_vector=target_vector,
-            plan=plan,
-        )
-        if candidate:
-            used_juice_names.add(_normalize(candidate.name))
-            suggestions.append(
-                IngredientSuggestion(candidate, max(top_up_needed, 40.0), "juice")
+        require_carbonated = bool(lengthener_rules.get("require_carbonated"))
+        unique_juices = _count_unique_juices(suggestions)
+        allow_new_unique = unique_juices < max_juices or require_carbonated
+        candidate: Optional[Ingredient] = None
+        reused_suggestion: Optional[IngredientSuggestion] = None
+        if not require_carbonated:
+            for suggestion in suggestions:
+                if suggestion.role == "juice":
+                    candidate = suggestion.ingredient
+                    reused_suggestion = suggestion
+                    break
+        if candidate is None and allow_new_unique:
+            candidate = _select_lengthener_candidate(
+                juices_pool,
+                profile,
+                association_model=association_model,
+                existing_tags=existing_tags,
+                used_names=used_juice_names,
+                keyword_hints=juice_hints,
+                knowledge_base=flavour_knowledge,
+                target_vector=target_vector,
+                plan=plan,
             )
+        if candidate:
+            addition_amount = max(top_up_needed, 40.0)
+            normalized_name = _normalize(candidate.name)
+            if reused_suggestion is not None:
+                reused_suggestion.amount_ml += addition_amount
+            else:
+                if normalized_name not in used_juice_names:
+                    used_juice_names.add(normalized_name)
+                suggestions.append(IngredientSuggestion(candidate, addition_amount, "juice"))
+                juice_hints.append(candidate.name)
             _ensure_palate_balance(suggestions, plan)
             existing_tags = _collect_tags(suggestions)
             total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)

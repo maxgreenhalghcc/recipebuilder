@@ -350,6 +350,9 @@ class PreferencePlan:
     garnish_hint: Optional[str]
     juice_focus: Optional[str]
 
+    juice_min_count: int = 1
+    juice_max_count: int = 2
+
     modifier_tags: Sequence[str] = field(default_factory=tuple)
     sweetener_tags: Sequence[str] = field(default_factory=tuple)
     juice_tags: Sequence[str] = field(default_factory=tuple)
@@ -891,6 +894,17 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         if lengthener_allowed is not False:
             lengthener_allowed = True
 
+    juice_min_count = 1
+    juice_max_count = 2
+    if glass_min_ml and glass_min_ml <= 180:
+        juice_max_count = 1
+    if dominant_template == "tpl_martini_style":
+        juice_max_count = 1
+    elif glass_min_ml and glass_min_ml >= 320:
+        juice_max_count = max(juice_max_count, 3 if lengthener_allowed else 2)
+    if lengthener_policy.get("require_carbonated"):
+        juice_max_count = max(juice_max_count, 3)
+
     return PreferencePlan(
         strength_oz=strength_oz,
         modifier_oz=modifier_oz,
@@ -930,6 +944,8 @@ def build_preference_plan(responses: Dict[str, Optional[str]]) -> PreferencePlan
         lengthener_rules=lengthener_policy,
         explanations=tuple(explanations) if explanations else tuple(),
         learning_hooks=tuple(sorted(learning_hooks)) if learning_hooks else tuple(),
+        juice_min_count=juice_min_count,
+        juice_max_count=juice_max_count,
     )
 
 

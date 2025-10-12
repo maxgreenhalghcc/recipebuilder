@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 from recipebuilder import FlavourAssociationModel, StockRepository, generate_cocktail_recipe
 from recipebuilder.recipe_engine import UnknownBarError
@@ -83,23 +83,62 @@ def _format_ingredient_list(recipe) -> list[str]:
     return items
 
 
-def _build_recipe_html(glass: str, ingredients: list[str], steps: list[str]) -> str:
-    """Create an HTML snippet mirroring the legacy integration output."""
+def _render_recipe_text(recipe, ingredients: list[str]) -> str:
+    """Produce a bartender-friendly plain text description of the recipe."""
 
-    ingredient_items = "".join(f"<li>{item}</li>" for item in ingredients)
-    step_items = "".join(f"<li>{step}</li>" for step in steps)
-    return (
-        f"<h3>Glass: {glass}</h3>"
-        f"<h3>Ingredients:</h3><ul>{ingredient_items}</ul>"
-        f"<h3>Method:</h3><ol>{step_items}</ol>"
-    )
+    lines: list[str] = []
+
+    title = recipe.name or "Signature Cocktail"
+    lines.append(title)
+    glass_line = f"Glass: {recipe.glassware}"
+    if recipe.ice:
+        glass_line += f" | Ice: {recipe.ice.lower()}"
+    lines.append(glass_line)
+
+    lines.append("")
+    lines.append("Ingredients:")
+    for item in ingredients:
+        lines.append(f"  - {item}")
+
+    lines.append("")
+    lines.append("Method:")
+    for index, step in enumerate(recipe.steps, start=1):
+        lines.append(f"  {index}. {step}")
+
+    if recipe.garnish:
+        lines.append("")
+        lines.append(f"Garnish: {recipe.garnish}")
+
+    if recipe.flavour_profile:
+        lines.append("")
+        lines.append("Flavour focus:")
+        for flavour, weight in recipe.flavour_profile:
+            lines.append(f"  - {flavour}: {weight:.2f}")
+
+    if recipe.explanations:
+        lines.append("")
+        lines.append("Why this works:")
+        for line in recipe.explanations:
+            lines.append(f"  - {line}")
+
+    if recipe.notes:
+        lines.append("")
+        lines.append(f"Notes: {recipe.notes}")
+
+    return "\n".join(lines)
+
+
+def _text_error(message: str, status_code: int) -> Response:
+    """Return a plain text error message."""
+
+    return Response(f"Error: {message}\n", status=status_code, mimetype="text/plain")
 
 
 @app.route("/generate", methods=["POST"])
 def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
-        return jsonify({"error": "Request body must be a JSON object."}), 400
+        return _text_error("Request body must be a JSON object.", 400)
 
     bar_id = payload.get("bar_id") or "cross_axes"
     responses = _normalise_responses({key: value for key, value in payload.items() if key != "bar_id"})
@@ -112,32 +151,14 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             association_model=_ASSOCIATION_MODEL,
         )
     except UnknownBarError as exc:
-        return jsonify({"error": str(exc)}), 404
+        return _text_error(str(exc), 404)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return _text_error(str(exc), 400)
 
     ingredients_list = _format_ingredient_list(recipe)
-    recipe_html = _build_recipe_html(recipe.glassware, ingredients_list, recipe.steps)
+    recipe_text = _render_recipe_text(recipe, ingredients_list)
 
-    flavour_profile = [
-        {"flavour": flavour, "weight": weight}
-        for flavour, weight in recipe.flavour_profile
-    ]
-
-    response_payload = {
-        "name": recipe.name,
-        "glass": recipe.glassware,
-        "ice": recipe.ice,
-        "ingredients_list": ingredients_list,
-        "garnish": recipe.garnish,
-        "steps": recipe.steps,
-        "flavour_profile": flavour_profile,
-        "recipe_html": recipe_html,
-        "notes": recipe.notes,
-        "explanations": list(recipe.explanations),
-    }
-
-    return jsonify(response_payload)
+    return Response(recipe_text + "\n", mimetype="text/plain")
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint
