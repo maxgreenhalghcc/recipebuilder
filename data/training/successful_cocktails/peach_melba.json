@@ -1,0 +1,14 @@
+{
+  "name": "Peach Melba",
+  "success_score": 4.6,
+  "max_score": 5,
+  "tags": ["peach", "berry", "spritz"],
+  "metadata": {"glassware": "gin glass", "ice": "cubed"},
+  "ingredients": [
+    {"name": "Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["gin", "botanical", "juniper"]},
+    {"name": "Raspberry Syrup", "role": "sweetener", "amount_ml": 25, "flavour_tags": ["raspberry", "berry", "sweet"]},
+    {"name": "Peach Puree", "role": "modifier", "amount_ml": 20, "flavour_tags": ["peach", "stone fruit", "velvety"]},
+    {"name": "Lemonade", "role": "juice", "amount_ml": 100, "flavour_tags": ["citrus", "sparkling", "sweet"]},
+    {"name": "Elderflower Cordial", "role": "modifier", "amount_ml": 10, "flavour_tags": ["elderflower", "floral", "sweet"]}
+  ]
+}
