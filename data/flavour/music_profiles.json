@@ -1,0 +1,54 @@
+{
+  "jazz/blues": {
+    "intensity": "low_mid",
+    "strength_oz": 1.5,
+    "aroma_tags": ["elegant", "herbal", "citrus", "smooth"],
+    "taste_bias": {"sweet": 0.34, "sour": 0.42, "bitter": 0.10, "salt": 0.07, "umami": 0.07},
+    "structure_bias": {"strength_abv": "mid", "body": -0.05, "sparkle": 0.2},
+    "ratio_nudge": {"base": [0.38, 0.42], "modifier": [0.12, 0.18], "sweetener": [0.10, 0.14], "juice": [0.30, 0.36]},
+    "abv_range": [12, 18],
+    "preferred_templates": {"tpl_collins": 0.45, "tpl_shaken_sour": 0.35, "tpl_martini_style": 0.20},
+    "base_spirit_bias": {"gin": 0.45, "vodka": 0.30, "rum": 0.15, "tequila": 0.05, "bourbon": 0.05},
+    "bitterness_tolerance": 0.3,
+    "garnishes": ["lemon twist", "mint sprig"]
+  },
+  "pop": {
+    "intensity": "mid",
+    "strength_oz": 2.0,
+    "aroma_tags": ["refreshing", "sweet", "tropical", "zesty", "bright"],
+    "taste_bias": {"sweet": 0.38, "sour": 0.42, "bitter": 0.08, "salt": 0.06, "umami": 0.06},
+    "structure_bias": {"strength_abv": "low_mid", "body": -0.10, "sparkle": 0.5},
+    "ratio_nudge": {"base": [0.40, 0.45], "modifier": [0.12, 0.16], "sweetener": [0.12, 0.16], "juice": [0.28, 0.36]},
+    "abv_range": [10, 16],
+    "preferred_templates": {"tpl_highball": 0.45, "tpl_collins": 0.35, "tpl_shaken_sour": 0.20},
+    "base_spirit_bias": {"vodka": 0.40, "rum": 0.30, "gin": 0.20, "tequila": 0.07, "bourbon": 0.03},
+    "bitterness_tolerance": 0.4,
+    "garnishes": ["orange wheel", "lime wheel", "fresh fruit"]
+  },
+  "rock": {
+    "intensity": "high",
+    "strength_oz": 2.25,
+    "aroma_tags": ["bold", "woody", "smoke", "spice", "rich"],
+    "taste_bias": {"sweet": 0.32, "sour": 0.35, "bitter": 0.20, "salt": 0.06, "umami": 0.07},
+    "structure_bias": {"strength_abv": "mid_high", "body": 0.15, "sparkle": 0.05},
+    "ratio_nudge": {"base": [0.48, 0.55], "modifier": [0.15, 0.20], "sweetener": [0.10, 0.14], "juice": [0.18, 0.25]},
+    "abv_range": [18, 26],
+    "preferred_templates": {"tpl_martini_style": 0.55, "tpl_shaken_sour": 0.25, "tpl_collins": 0.20},
+    "base_spirit_bias": {"bourbon": 0.45, "rum": 0.25, "mezcal": 0.15, "gin": 0.08, "vodka": 0.07},
+    "bitterness_tolerance": 0.75,
+    "garnishes": ["orange twist", "rosemary sprig", "smoked garnish"]
+  },
+  "rap": {
+    "intensity": "mid_high",
+    "strength_oz": 1.75,
+    "aroma_tags": ["bold", "sweet", "spice", "citrus"],
+    "taste_bias": {"sweet": 0.42, "sour": 0.38, "bitter": 0.12, "salt": 0.04, "umami": 0.04},
+    "structure_bias": {"strength_abv": "mid", "body": 0.10, "sparkle": 0.2},
+    "ratio_nudge": {"base": [0.45, 0.52], "modifier": [0.15, 0.20], "sweetener": [0.12, 0.18], "juice": [0.18, 0.25]},
+    "abv_range": [16, 22],
+    "preferred_templates": {"tpl_martini_style": 0.40, "tpl_collins": 0.35, "tpl_shaken_sour": 0.25},
+    "base_spirit_bias": {"rum": 0.35, "tequila": 0.25, "vodka": 0.20, "bourbon": 0.15, "gin": 0.05},
+    "bitterness_tolerance": 0.55,
+    "garnishes": ["lemon twist", "spiced rim"]
+  }
+}
