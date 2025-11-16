@@ -1,0 +1,93 @@
+"""Tests for the Flask service response payload formatting."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+pytest.importorskip("flask")
+
+import service
+
+
+class DummySuggestion:
+    def __init__(self, name: str, role: str, amount_ml: float) -> None:
+        self.ingredient = SimpleNamespace(name=name)
+        self.role = role
+        self.amount_ml = amount_ml
+
+
+def _build_dummy_recipe():
+    return SimpleNamespace(
+        name="Test Drink",
+        glassware="martini glass",
+        ice="none",
+        garnish="lemon twist",
+        steps=["Shake with ice", "Fine strain"],
+        explanations=["Matches citrus focus"],
+        notes="Guest prefers bright citrus",
+        ingredients=[DummySuggestion("Vodka", "base", 50.0)],
+        flavour_profile=[("citrus", 0.8)],
+    )
+
+
+@pytest.fixture()
+def client():
+    service.app.testing = True
+    return service.app.test_client()
+
+
+def test_generate_returns_structured_payload(monkeypatch, client):
+    dummy_recipe = _build_dummy_recipe()
+
+    def fake_generate(responses, bar_id, repository, association_model):  # noqa: D401
+        return dummy_recipe
+
+    monkeypatch.setattr(service, "generate_cocktail_recipe", fake_generate)
+
+    payload = {
+        "bar_id": "cross_axes",
+        "base_spirit": "gin",
+        "season": "summer",
+        "house_type": "modern house",
+    }
+
+    response = client.post("/generate", json=payload)
+    assert response.status_code == 200
+
+    data = response.get_json()
+    assert data["data"]["body"]["glassware"] == "martini glass"
+    assert data["data"]["body"]["garnish"] == "lemon twist"
+    assert data["data"]["body"]["ingredients"][0].startswith("50ml Vodka")
+    assert "1. Shake with ice" in data["data"]["body"]["method"]
+    assert data["data"]["body"]["warnings"] == [
+        "Matches citrus focus",
+        "Guest prefers bright citrus",
+    ]
+
+
+def test_generate_uses_session_identifiers(monkeypatch, client):
+    dummy_recipe = _build_dummy_recipe()
+    captured = {}
+
+    def fake_generate(responses, bar_id, repository, association_model):
+        captured["bar_id"] = bar_id
+        return dummy_recipe
+
+    monkeypatch.setattr(service, "generate_cocktail_recipe", fake_generate)
+
+    payload = {
+        "session": {"barId": "enchanted", "id": "session-123"},
+        "base_spirit": "vodka",
+        "season": "spring",
+        "house_type": "tree house",
+    }
+
+    response = client.post("/generate", json=payload)
+    assert response.status_code == 200
+
+    data = response.get_json()
+    assert captured["bar_id"] == "enchanted"
+    assert data["data"]["barId"] == "enchanted"
+    assert data["data"]["sessionId"] == "session-123"

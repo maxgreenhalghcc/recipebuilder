@@ -82,66 +82,64 @@ def _format_ingredient_list(recipe) -> list[str]:
         items.append(f"Serve over {recipe.ice.lower()}")
     return items
 
+def _build_method_text(recipe) -> str:
+    """Condense the method instructions into a readable paragraph."""
 
-def _render_recipe_text(recipe, ingredients: list[str]) -> str:
-    """Produce a bartender-friendly plain text description of the recipe."""
+    if recipe.steps:
+        steps = [f"{index}. {step}" for index, step in enumerate(recipe.steps, start=1)]
+        return "\n".join(steps)
+    return "Please use your judgement based on guest preferences."
 
-    lines: list[str] = []
 
-    title = recipe.name or "Signature Cocktail"
-    lines.append(title)
-    glass_line = f"Glass: {recipe.glassware}"
-    if recipe.ice:
-        glass_line += f" | Ice: {recipe.ice.lower()}"
-    lines.append(glass_line)
-
-    lines.append("")
-    lines.append("Ingredients:")
-    for item in ingredients:
-        lines.append(f"  - {item}")
-
-    lines.append("")
-    lines.append("Method:")
-    for index, step in enumerate(recipe.steps, start=1):
-        lines.append(f"  {index}. {step}")
-
-    if recipe.garnish:
-        lines.append("")
-        lines.append(f"Garnish: {recipe.garnish}")
-
-    if recipe.flavour_profile:
-        lines.append("")
-        lines.append("Flavour focus:")
-        for flavour, weight in recipe.flavour_profile:
-            lines.append(f"  - {flavour}: {weight:.2f}")
-
+def _collect_warnings(recipe) -> list[str]:
+    warnings: list[str] = []
     if recipe.explanations:
-        lines.append("")
-        lines.append("Why this works:")
-        for line in recipe.explanations:
-            lines.append(f"  - {line}")
-
+        warnings.extend(recipe.explanations)
     if recipe.notes:
-        lines.append("")
-        lines.append(f"Notes: {recipe.notes}")
-
-    return "\n".join(lines)
+        warnings.append(recipe.notes)
+    return warnings
 
 
-def _text_error(message: str, status_code: int) -> Response:
-    """Return a plain text error message."""
+def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[str]]:
+    """Determine the bar ID and session ID from the request payload."""
 
-    return Response(f"Error: {message}\n", status=status_code, mimetype="text/plain")
+    session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
+
+    bar_id_value = payload.get("bar_id") or payload.get("barId")
+    if session_info:
+        bar_id_value = session_info.get("barId") or session_info.get("bar_id") or bar_id_value
+
+    if bar_id_value is None:
+        bar_id = "cross_axes"
+    else:
+        bar_id = str(bar_id_value).strip() or "cross_axes"
+
+    session_id_value = (
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or (session_info.get("id") if session_info else None)
+        or (session_info.get("sessionId") if session_info else None)
+    )
+    session_id = str(session_id_value) if session_id_value is not None else None
+
+    return bar_id, session_id
+
+
+def _json_error(message: str, status_code: int) -> Response:
+    """Return a JSON error payload."""
+
+    return jsonify({"error": message}), status_code
 
 
 @app.route("/generate", methods=["POST"])
 def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
-        return _text_error("Request body must be a JSON object.", 400)
+        return _json_error("Request body must be a JSON object.", 400)
 
-    bar_id = payload.get("bar_id") or "cross_axes"
-    responses = _normalise_responses({key: value for key, value in payload.items() if key != "bar_id"})
+    bar_id, session_id = _extract_bar_and_session(payload)
+    reserved_keys = {"bar_id", "barId", "session", "session_id", "sessionId"}
+    responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
 
     try:
         recipe = generate_cocktail_recipe(
@@ -151,14 +149,32 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             association_model=_ASSOCIATION_MODEL,
         )
     except UnknownBarError as exc:
-        return _text_error(str(exc), 404)
+        return _json_error(str(exc), 404)
     except ValueError as exc:
-        return _text_error(str(exc), 400)
+        return _json_error(str(exc), 400)
 
     ingredients_list = _format_ingredient_list(recipe)
-    recipe_text = _render_recipe_text(recipe, ingredients_list)
+    method_text = _build_method_text(recipe)
+    warnings = _collect_warnings(recipe)
 
-    return Response(recipe_text + "\n", mimetype="text/plain")
+    response_payload = {
+        "data": {
+            "barId": bar_id,
+            "sessionId": session_id,
+            "name": recipe.name or "Custom cocktail",
+            "description": "A bespoke cocktail created from your quiz answers.",
+            "body": {
+                "ingredients": ingredients_list,
+                "method": method_text,
+                "glassware": recipe.glassware,
+                "garnish": recipe.garnish or "",
+                "warnings": warnings,
+            },
+            "abvEstimate": None,
+        }
+    }
+
+    return jsonify(response_payload)
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint
