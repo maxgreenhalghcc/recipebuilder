@@ -1,0 +1,13 @@
+{
+  "name": "Sex on the Beach",
+  "success_score": 4.4,
+  "max_score": 5,
+  "tags": ["tropical", "stone fruit", "crowd pleaser"],
+  "metadata": {"glassware": "long glass", "ice": "cubed"},
+  "ingredients": [
+    {"name": "Vodka", "role": "base", "amount_ml": 25, "flavour_tags": ["vodka", "clean", "neutral"]},
+    {"name": "Peach Schnapps", "role": "modifier", "amount_ml": 25, "flavour_tags": ["peach", "stone fruit", "sweet"]},
+    {"name": "Orange Juice", "role": "juice", "amount_ml": 50, "flavour_tags": ["orange", "citrus", "zesty"]},
+    {"name": "Cranberry Juice", "role": "juice", "amount_ml": 50, "flavour_tags": ["cranberry", "berry", "tart"]}
+  ]
+}
