@@ -24,3 +24,12 @@ def test_loads_enchanted_bar_inventory():
     names = {ingredient.name.lower() for ingredient in ingredients}
     assert "normal gin" in names or "gin" in names
     assert "pineapple juice" in names
+
+
+def test_loads_demo_bar_inventory():
+    repo = StockRepository()
+    ingredients = repo.load_bar_stock("demo-bar")
+    names = {ingredient.name.lower() for ingredient in ingredients}
+    assert "premium vodka" in names
+    assert "passion fruit juice" in names
+    assert "mint sprig" in names
