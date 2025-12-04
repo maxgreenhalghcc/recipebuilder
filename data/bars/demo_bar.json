@@ -1,0 +1,439 @@
+{
+  "bar": "UK Cocktail Bar",
+  "ingredients": [
+    {
+      "name": "Vodka",
+      "category": "spirit",
+      "flavour_tags": ["clean", "zesty", "vibrant"],
+      "profiles": ["clean", "zesty", "vibrant"],
+      "aromas": ["citrus", "sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Premium Vodka",
+      "category": "spirit",
+      "flavour_tags": ["clean", "elegant"],
+      "profiles": ["clean", "elegant"],
+      "aromas": ["citrus"],
+      "seasons": ["spring", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "London Dry Gin",
+      "category": "spirit",
+      "flavour_tags": ["botanical", "fresh", "floral"],
+      "profiles": ["botanical", "fresh", "floral"],
+      "aromas": ["floral", "citrus"],
+      "seasons": ["spring"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Premium Gin",
+      "category": "spirit",
+      "flavour_tags": ["botanical", "complex"],
+      "profiles": ["botanical", "complex"],
+      "aromas": ["floral"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Flavoured Gin",
+      "category": "spirit",
+      "flavour_tags": ["fruity", "fresh"],
+      "profiles": ["fruity", "fresh"],
+      "aromas": ["floral"],
+      "seasons": ["spring"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "White Rum",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "light"],
+      "profiles": ["tropical", "light"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Dark Rum",
+      "category": "spirit",
+      "flavour_tags": ["rich", "indulgent"],
+      "profiles": ["rich", "indulgent"],
+      "aromas": ["woody"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Spiced Rum",
+      "category": "spirit",
+      "flavour_tags": ["spiced", "warm"],
+      "profiles": ["spiced", "warm"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Aged Rum",
+      "category": "spirit",
+      "flavour_tags": ["rich", "smooth"],
+      "profiles": ["rich", "smooth"],
+      "aromas": ["sweet", "woody"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Blended Scotch",
+      "category": "spirit",
+      "flavour_tags": ["warm", "classic"],
+      "profiles": ["warm", "classic"],
+      "aromas": ["woody", "smoky"],
+      "seasons": ["winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Bourbon",
+      "category": "spirit",
+      "flavour_tags": ["indulgent", "warm", "classic"],
+      "profiles": ["indulgent", "warm", "classic"],
+      "aromas": ["woody", "sweet"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Irish Whiskey",
+      "category": "spirit",
+      "flavour_tags": ["smooth", "light"],
+      "profiles": ["smooth", "light"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Tequila Blanco",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Tequila Reposado",
+      "category": "spirit",
+      "flavour_tags": ["warm", "smooth"],
+      "profiles": ["warm", "smooth"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Mezcal",
+      "category": "spirit",
+      "flavour_tags": ["smoky", "earthy"],
+      "profiles": ["smoky", "earthy"],
+      "aromas": ["smoke"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Cognac",
+      "category": "spirit",
+      "flavour_tags": ["rich", "indulgent"],
+      "profiles": ["rich", "indulgent"],
+      "aromas": ["woody"],
+      "seasons": ["winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Triple Sec",
+      "category": "modifier",
+      "flavour_tags": ["zesty", "vibrant"],
+      "profiles": ["zesty", "vibrant"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "spirits": ["vodka", "tequila", "rum"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Aperitif Bitter",
+      "category": "modifier",
+      "flavour_tags": ["bitter", "zesty"],
+      "profiles": ["bitter", "zesty"],
+      "aromas": ["citrus", "herbal"],
+      "seasons": ["summer"],
+      "spirits": ["gin", "vodka"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Peach Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["sweet", "fresh"],
+      "profiles": ["sweet", "fresh"],
+      "aromas": ["fruity"],
+      "seasons": ["spring", "summer"],
+      "spirits": ["vodka", "gin"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Raspberry Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "spirits": ["vodka", "gin"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Melon Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["fresh", "vibrant"],
+      "profiles": ["fresh", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Passion Fruit Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["tropical", "exotic"],
+      "profiles": ["tropical", "exotic"],
+      "aromas": ["sweet"],
+      "seasons": ["summer", "winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Coffee Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["rich", "indulgent"],
+      "profiles": ["rich", "indulgent"],
+      "aromas": ["earthy"],
+      "seasons": ["winter"],
+      "spirits": ["vodka", "bourbon"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Amaretto",
+      "category": "modifier",
+      "flavour_tags": ["nutty", "rich"],
+      "profiles": ["nutty", "rich"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "spirits": ["bourbon"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Elderflower Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["floral", "fresh"],
+      "profiles": ["floral", "fresh"],
+      "aromas": ["floral"],
+      "seasons": ["spring"],
+      "spirits": ["gin", "vodka"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Dry Vermouth",
+      "category": "modifier",
+      "flavour_tags": ["dry", "herbal"],
+      "profiles": ["dry", "herbal"],
+      "aromas": ["floral"],
+      "seasons": ["spring"],
+      "spirits": ["gin"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Sweet Vermouth",
+      "category": "modifier",
+      "flavour_tags": ["rich", "herbal"],
+      "profiles": ["rich", "herbal"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "spirits": ["whisky", "bourbon"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Pimm's No.1",
+      "category": "modifier",
+      "flavour_tags": ["fresh", "fruity"],
+      "profiles": ["fresh", "fruity"],
+      "aromas": ["herbal", "citrus"],
+      "seasons": ["summer"],
+      "spirits": ["gin", "vodka"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Simple Syrup",
+      "category": "syrup",
+      "flavour_tags": ["sweet", "neutral"],
+      "profiles": ["sweet", "neutral"],
+      "aromas": ["sweet"],
+      "seasons": ["all"],
+      "spirits": ["all"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Grenadine",
+      "category": "syrup",
+      "flavour_tags": ["candy", "classic"],
+      "profiles": ["candy", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Vanilla Syrup",
+      "category": "syrup",
+      "flavour_tags": ["rich", "classic"],
+      "profiles": ["rich", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Caramel Syrup",
+      "category": "syrup",
+      "flavour_tags": ["indulgent", "rich"],
+      "profiles": ["indulgent", "rich"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "spirits": ["bourbon", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Honey Syrup",
+      "category": "syrup",
+      "flavour_tags": ["earthy", "warm"],
+      "profiles": ["earthy", "warm"],
+      "aromas": ["sweet"],
+      "seasons": ["autumn"],
+      "spirits": ["bourbon", "tequila"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Elderflower Cordial",
+      "category": "syrup",
+      "flavour_tags": ["fresh", "floral"],
+      "profiles": ["fresh", "floral"],
+      "aromas": ["floral"],
+      "seasons": ["spring"],
+      "spirits": ["gin", "vodka"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Orange Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["spring"],
+      "spirits": ["vodka", "gin", "tequila"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Pineapple Juice",
+      "category": "juice",
+      "flavour_tags": ["tropical", "vibrant"],
+      "profiles": ["tropical", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "spirits": ["rum", "vodka"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Cranberry Juice",
+      "category": "juice",
+      "flavour_tags": ["dry", "subtle"],
+      "profiles": ["dry", "subtle"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Passion Fruit Juice",
+      "category": "juice",
+      "flavour_tags": ["exotic", "indulgent"],
+      "profiles": ["exotic", "indulgent"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Apple Juice",
+      "category": "juice",
+      "flavour_tags": ["fresh", "crisp"],
+      "profiles": ["fresh", "crisp"],
+      "aromas": ["fruity"],
+      "seasons": ["spring", "autumn"],
+      "spirits": ["vodka", "gin"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Lemon Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "sharp"],
+      "profiles": ["zesty", "sharp"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "spirits": ["gin", "vodka", "rum", "tequila"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Lime Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "spirits": ["rum", "tequila", "vodka"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Lemon Wedge",
+      "category": "garnish",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"]
+    },
+    {
+      "name": "Lime Wedge",
+      "category": "garnish",
+      "flavour_tags": ["zesty", "clean"],
+      "profiles": ["zesty", "clean"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"]
+    },
+    {
+      "name": "Orange Slice",
+      "category": "garnish",
+      "flavour_tags": ["zesty", "sweet"],
+      "profiles": ["zesty", "sweet"],
+      "aromas": ["citrus"],
+      "seasons": ["spring", "summer"]
+    },
+    {
+      "name": "Mint Sprig",
+      "category": "garnish",
+      "flavour_tags": ["fresh", "herbal"],
+      "profiles": ["fresh", "herbal"],
+      "aromas": ["herbal"],
+      "seasons": ["summer"]
+    },
+    {
+      "name": "Maraschino Cherry",
+      "category": "garnish",
+      "flavour_tags": ["indulgent", "classic"],
+      "profiles": ["indulgent", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"]
+    }
+  ]
+}

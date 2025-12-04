@@ -1,0 +1,42 @@
+{
+  "samples": [
+    {
+      "name": "Summer Garden Highball",
+      "success_score": 4.9,
+      "max_score": 5,
+      "tags": ["refreshing", "herbal", "citrus"],
+      "metadata": {"glassware": "highball", "ice": "cubed"},
+      "ingredients": [
+        {"name": "Cross Axes Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["botanical", "citrus", "juniper"]},
+        {"name": "Elderflower Liqueur", "role": "modifier", "amount_ml": 20, "flavour_tags": ["floral", "sweet"]},
+        {"name": "Lime Cordial", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["citrus", "zesty"]},
+        {"name": "Soda Water", "role": "juice", "amount_ml": 80, "flavour_tags": ["sparkling", "neutral"]}
+      ]
+    },
+    {
+      "name": "Smoked Agave Old Fashioned",
+      "success_score": 4.6,
+      "max_score": 5,
+      "tags": ["smoky", "agave", "bold"],
+      "metadata": {"glassware": "rocks", "ice": "block"},
+      "ingredients": [
+        {"name": "Mezcal", "role": "base", "amount_ml": 55, "flavour_tags": ["smoke", "agave", "earthy"]},
+        {"name": "Ancho Chile Liqueur", "role": "modifier", "amount_ml": 15, "flavour_tags": ["spice", "sweet"]},
+        {"name": "Agave Syrup", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["sweet", "agave"]}
+      ]
+    },
+    {
+      "name": "Velvet Espresso Flip",
+      "success_score": 4.8,
+      "max_score": 5,
+      "tags": ["dessert", "coffee", "chocolate"],
+      "metadata": {"glassware": "coupe", "ice": "none"},
+      "ingredients": [
+        {"name": "Dark Rum", "role": "base", "amount_ml": 45, "flavour_tags": ["rum", "caramel"]},
+        {"name": "Cold Brew Coffee", "role": "modifier", "amount_ml": 30, "flavour_tags": ["coffee", "bitter"]},
+        {"name": "Cocoa Liqueur", "role": "sweetener", "amount_ml": 20, "flavour_tags": ["chocolate", "sweet"]},
+        {"name": "Cream", "role": "juice", "amount_ml": 30, "flavour_tags": ["dairy", "silky"]}
+      ]
+    }
+  ]
+}
