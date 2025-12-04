@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -9,6 +10,9 @@ from flask import Flask, Response, jsonify, request
 
 from recipebuilder import FlavourAssociationModel, StockRepository, generate_cocktail_recipe
 from recipebuilder.recipe_engine import UnknownBarError
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -138,6 +142,7 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
         return _json_error("Request body must be a JSON object.", 400)
 
     bar_id, session_id = _extract_bar_and_session(payload)
+    logger.info("Received generation request for bar=%s session=%s", bar_id, session_id)
     reserved_keys = {"bar_id", "barId", "session", "session_id", "sessionId"}
     responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
 

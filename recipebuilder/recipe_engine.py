@@ -20,6 +20,9 @@ from recipebuilder.flavour_context import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def _coerce_string_list(value: Optional[object]) -> List[str]:
     """Convert free-form JSON fields into a clean list of strings."""
 
