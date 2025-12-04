@@ -172,8 +172,12 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             association_model=_ASSOCIATION_MODEL,
         )
     except UnknownBarError as exc:
+        # Log full traceback so we can see exactly why the bar failed
+        logger.exception("UnknownBarError during recipe generation")
         return _json_error(str(exc), 404)
     except ValueError as exc:
+        # Log full traceback for any generation logic issues
+        logger.exception("ValueError during recipe generation")
         return _json_error(str(exc), 400)
 
     ingredients_list = _format_ingredient_list(recipe)
