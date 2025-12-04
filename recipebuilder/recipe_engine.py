@@ -1570,7 +1570,7 @@ def generate_cocktail_recipe(
     if association_model is None:
         association_model = _load_default_association_model()
 
-    ingredients = repository.load_bar_stock(bar)
+    ingredients = repository.load_bar_stock(bar_id)
 
     flavour_knowledge = _load_flavour_knowledge()
     for item in ingredients:
