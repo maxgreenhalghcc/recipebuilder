@@ -1,10 +1,11 @@
 """Core recipe engine for generating personalized cocktail recipes."""
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
 from itertools import combinations
+from pathlib import Path
 from statistics import mean
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
@@ -615,6 +616,8 @@ class StockRepository:
             raise UnknownBarError(
                 f"Stock list for bar '{bar_id}' not found at any of {[str(c) for c in candidates]}"
             )
+
+        logger.info("Loading stock for bar '%s' from %s", bar_id, path)
 
         with path.open("r", encoding="utf-8") as handle:
             raw = json.load(handle)
@@ -1559,6 +1562,8 @@ def generate_cocktail_recipe(
 ) -> CocktailRecipe:
     """Generate a personalized cocktail recipe for the specified bar stock."""
 
+    logger.info("Starting recipe generation for bar '%s'", bar_id)
+
     if repository is None:
         repository = StockRepository()
 
@@ -1572,6 +1577,13 @@ def generate_cocktail_recipe(
         flavour_knowledge.enrich_ingredient(item)
 
     plan = build_preference_plan(responses)
+    logger.debug(
+        "Built preference plan: glass=%s, templates=%s, juice_max=%s, lengthener=%s",
+        plan.glass_type,
+        sorted(plan.template_weights.keys()),
+        plan.juice_max_count,
+        plan.lengtheners,
+    )
     profile = collect_profile_tags(responses, plan)
     target_vector = flavour_knowledge.build_target_vector(responses, plan=plan)
     target_tag_weights = flavour_knowledge.mapping.target_tags_from_responses(responses)
@@ -1579,6 +1591,7 @@ def generate_cocktail_recipe(
 
     avoid_terms = _extract_avoid_terms(responses.get("notes"))
     if avoid_terms:
+        logger.info("Applying %d avoidance terms from notes", len(avoid_terms))
         filtered = [ing for ing in ingredients if not _should_exclude(ing, avoid_terms)]
         if not filtered:
             raise ValueError("No available ingredients after applying guest restrictions.")
@@ -1609,6 +1622,8 @@ def generate_cocktail_recipe(
         )
     if base is None:
         raise ValueError("No base spirit available in the bar stock list.")
+
+    logger.info("Selected base spirit: %s", base.name)
 
     suggestions: List[IngredientSuggestion] = []
 
@@ -1909,6 +1924,19 @@ def generate_cocktail_recipe(
     steps = _build_steps(recipe_name, suggestions, glassware, ice, garnish_name, lengthener_note)
 
     sorted_profile = sorted(profile.items(), key=lambda item: item[1], reverse=True)
+
+    logger.info(
+        "Built recipe '%s' for bar '%s' using template '%s' with %d ingredients (similarity=%.2f)",
+        recipe_name,
+        bar_id,
+        selected_template.name if selected_template else "custom-balance",
+        len(suggestions),
+        final_similarity if isinstance(final_similarity, (int, float)) else 0.0,
+    )
+    logger.debug(
+        "Ingredients: %s",
+        [f"{s.amount_ml:.0f}ml {s.ingredient.name} ({s.role})" for s in suggestions],
+    )
 
     return CocktailRecipe(
         name=recipe_name,
