@@ -2,7 +2,7 @@
   "bar": "level 256",
   "ingredients": [
 
-    /* ─────────────── VODKA ─────────────── */
+
 
     {
       "name": "Absolut Blue",
@@ -59,7 +59,6 @@
       "default_measure_ml": 50
     },
 
-    /* ─────────────── GIN ─────────────── */
 
     {
       "name": "Beefeater",
@@ -89,7 +88,7 @@
       "default_measure_ml": 50
     },
 
-    /* ─────────────── RUM ─────────────── */
+
 
     {
       "name": "Bacardi",
@@ -128,7 +127,6 @@
       "default_measure_ml": 40
     },
 
-    /* ─────────────── TEQUILA & MODIFIERS ─────────────── */
 
     {
       "name": "Tequila",
@@ -158,7 +156,6 @@
       "default_measure_ml": 20
     },
 
-    /* ─────────────── JUICES ─────────────── */
 
     {
       "name": "Orange Juice",
@@ -201,7 +198,6 @@
       "default_measure_ml": 25
     },
 
-    /* ─────────────── SYRUPS (MONIN) ─────────────── */
 
     {
       "name": "Monin Sugar Syrup",
