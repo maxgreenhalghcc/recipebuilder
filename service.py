@@ -112,26 +112,39 @@ def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[
         payload.get("bar_id"),
         payload.get("barId"),
     )
-    session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
 
-    bar_id_value = payload.get("bar_id") or payload.get("barId")
-    if session_info:
-        bar_id_value = session_info.get("barId") or session_info.get("bar_id") or bar_id_value
+    # 1) Work out the session id (if provided)
+    session_info = payload.get("session")
+    if isinstance(session_info, dict):
+        session_id_value = (
+            session_info.get("id")
+            or session_info.get("sessionId")
+            or session_info.get("session_id")
+        )
+    else:
+        session_id_value = session_info
+
+    session_id: Optional[str]
+    if session_id_value is None:
+        session_id = None
+    else:
+        session_id = str(session_id_value)
+
+    # 2) Prefer bar slug in `bar`, then fall back to bar_id / barId
+    bar_id_value = (
+        payload.get("bar")
+        or payload.get("bar_id")
+        or payload.get("barId")
+    )
 
     if bar_id_value is None:
-        bar_id = "cross_axes"
-    else:
-        bar_id = str(bar_id_value).strip() or "cross_axes"
+        # ❌ Don't silently default – fail loudly so we know what's wrong
+        raise UnknownBarError("Missing bar id in request payload")
 
-    session_id_value = (
-        payload.get("session_id")
-        or payload.get("sessionId")
-        or (session_info.get("id") if session_info else None)
-        or (session_info.get("sessionId") if session_info else None)
-    )
-    session_id = str(session_id_value) if session_id_value is not None else None
+    bar_id = str(bar_id_value).strip()
 
     return bar_id, session_id
+
 
 
 def _json_error(message: str, status_code: int) -> Response:
