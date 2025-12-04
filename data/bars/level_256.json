@@ -1,0 +1,297 @@
+{
+  "bar": "level 256",
+  "ingredients": [
+
+    /* ─────────────── VODKA ─────────────── */
+
+    {
+      "name": "Absolut Blue",
+      "category": "spirit",
+      "flavour_tags": ["clean", "smooth"],
+      "profiles": ["clean", "smooth"],
+      "aromas": ["citrus"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Absolut Vanilla",
+      "category": "spirit",
+      "flavour_tags": ["rich", "classic"],
+      "profiles": ["rich", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Absolut Citron",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "vibrant"],
+      "profiles": ["zesty", "vibrant"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Absolut Wild Berri",
+      "category": "spirit",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Absolut Hunni",
+      "category": "spirit",
+      "flavour_tags": ["earthy", "warm"],
+      "profiles": ["earthy", "warm"],
+      "aromas": ["sweet"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Absolut Raspberri",
+      "category": "spirit",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["sweet", "berry"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+
+    /* ─────────────── GIN ─────────────── */
+
+    {
+      "name": "Beefeater",
+      "category": "spirit",
+      "flavour_tags": ["botanical", "fresh"],
+      "profiles": ["botanical", "fresh"],
+      "aromas": ["floral", "citrus"],
+      "seasons": ["spring"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Beefeater Pink",
+      "category": "spirit",
+      "flavour_tags": ["fruity", "romantic"],
+      "profiles": ["fruity", "romantic"],
+      "aromas": ["floral"],
+      "seasons": ["spring"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Beefeater Orange",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "clean"],
+      "profiles": ["zesty", "clean"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+
+    /* ─────────────── RUM ─────────────── */
+
+    {
+      "name": "Bacardi",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "light"],
+      "profiles": ["tropical", "light"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Bacardi Spiced",
+      "category": "spirit",
+      "flavour_tags": ["spiced", "warm"],
+      "profiles": ["spiced", "warm"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Malibu Original",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "coconut"],
+      "profiles": ["tropical", "coconut"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 40
+    },
+    {
+      "name": "Malibu Strawberry",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "fruity"],
+      "profiles": ["tropical", "fruity"],
+      "aromas": ["sweet", "berry"],
+      "seasons": ["summer"],
+      "default_measure_ml": 40
+    },
+
+    /* ─────────────── TEQUILA & MODIFIERS ─────────────── */
+
+    {
+      "name": "Tequila",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Archers Peach Schnapps",
+      "category": "spirit",
+      "flavour_tags": ["sweet", "fresh"],
+      "profiles": ["sweet", "fresh"],
+      "aromas": ["fruity"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Disaronno",
+      "category": "modifier",
+      "flavour_tags": ["nutty", "rich"],
+      "profiles": ["nutty", "rich"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "default_measure_ml": 20
+    },
+
+    /* ─────────────── JUICES ─────────────── */
+
+    {
+      "name": "Orange Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["spring"],
+      "spirits": ["vodka", "gin", "tequila"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Passion Fruit Juice",
+      "category": "juice",
+      "flavour_tags": ["exotic", "indulgent"],
+      "profiles": ["exotic", "indulgent"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Pineapple Juice",
+      "category": "juice",
+      "flavour_tags": ["tropical", "vibrant"],
+      "profiles": ["tropical", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "spirits": ["rum", "vodka"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Cranberry Juice",
+      "category": "juice",
+      "flavour_tags": ["dry", "subtle"],
+      "profiles": ["dry", "subtle"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 25
+    },
+
+    /* ─────────────── SYRUPS (MONIN) ─────────────── */
+
+    {
+      "name": "Monin Sugar Syrup",
+      "category": "syrup",
+      "flavour_tags": ["sweet", "neutral"],
+      "profiles": ["sweet", "neutral"],
+      "aromas": ["sweet"],
+      "seasons": ["all"],
+      "spirits": ["all"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Grenadine",
+      "category": "syrup",
+      "flavour_tags": ["candy", "classic"],
+      "profiles": ["candy", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Caramel",
+      "category": "syrup",
+      "flavour_tags": ["indulgent", "rich"],
+      "profiles": ["indulgent", "rich"],
+      "aromas": ["sweet"],
+      "seasons": ["autumn", "winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Vanilla",
+      "category": "syrup",
+      "flavour_tags": ["rich", "classic"],
+      "profiles": ["rich", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Honey",
+      "category": "syrup",
+      "flavour_tags": ["earthy", "warm"],
+      "profiles": ["earthy", "warm"],
+      "aromas": ["sweet"],
+      "seasons": ["autumn"],
+      "spirits": ["whisky", "tequila"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Coconut",
+      "category": "syrup",
+      "flavour_tags": ["tropical", "creamy"],
+      "profiles": ["tropical", "creamy"],
+      "aromas": ["coconut"],
+      "seasons": ["summer"],
+      "spirits": ["rum", "vodka"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Raspberry",
+      "category": "syrup",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "spirits": ["vodka", "gin"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Butterscotch",
+      "category": "syrup",
+      "flavour_tags": ["indulgent", "rich"],
+      "profiles": ["indulgent", "rich"],
+      "aromas": ["sweet"],
+      "seasons": ["autumn", "winter"],
+      "spirits": ["vodka", "rum"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Monin Blueberry",
+      "category": "syrup",
+      "flavour_tags": ["fruity", "subtle"],
+      "profiles": ["fruity", "subtle"],
+      "aromas": ["berry"],
+      "seasons": ["spring", "summer"],
+      "spirits": ["vodka", "gin"],
+      "default_measure_ml": 15
+    }
+  ]
+}
