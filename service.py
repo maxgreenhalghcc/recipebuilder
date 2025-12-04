@@ -106,7 +106,12 @@ def _collect_warnings(recipe) -> list[str]:
 
 def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[str]]:
     """Determine the bar ID and session ID from the request payload."""
-
+    logger.info(
+        "BAR EXTRACTION: bar=%s bar_id=%s barId=%s",
+        payload.get("bar"),
+        payload.get("bar_id"),
+        payload.get("barId"),
+    )
     session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
 
     bar_id_value = payload.get("bar_id") or payload.get("barId")
