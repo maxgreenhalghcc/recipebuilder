@@ -10,6 +10,7 @@ from statistics import mean
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
 import re
+import logging
 
 from recipebuilder.preferences import PreferencePlan, build_preference_plan, collect_profile_tags
 from recipebuilder.flavour_context import (
@@ -1344,11 +1345,11 @@ def _determine_glassware(responses: Dict[str, str]) -> str:
     season = _normalize(responses.get("season", ""))
 
     if style in {"fine dining", "tasting menu"}:
-        return "Nick & Nora glass"
+        return "Short glass"
     if season in {"summer", "spring", "al fresco"}:
         return "Chilled coupe"
     if house in {"rustic"}:
-        return "Rocks glass"
+        return "Long glass"
     return "Double old fashioned"
 
 
