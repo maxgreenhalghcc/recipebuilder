@@ -106,45 +106,38 @@ def _collect_warnings(recipe) -> list[str]:
 
 def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[str]]:
     """Determine the bar ID and session ID from the request payload."""
-    logger.info(
-        "BAR EXTRACTION: bar=%s bar_id=%s barId=%s",
-        payload.get("bar"),
-        payload.get("bar_id"),
-        payload.get("barId"),
-    )
 
-    # 1) Work out the session id (if provided)
-    session_info = payload.get("session")
-    if isinstance(session_info, dict):
-        session_id_value = (
-            session_info.get("id")
-            or session_info.get("sessionId")
-            or session_info.get("session_id")
-        )
-    else:
-        session_id_value = session_info
-
-    session_id: Optional[str]
-    if session_id_value is None:
-        session_id = None
-    else:
-        session_id = str(session_id_value)
-
-    # 2) Prefer bar slug in `bar`, then fall back to bar_id / barId
+    session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
+    
+    # Prefer `bar`, then fall back to bar_id / barId
     bar_id_value = (
         payload.get("bar")
         or payload.get("bar_id")
         or payload.get("barId")
     )
-
+    
+    if session_info:
+        bar_id_value = (
+            session_info.get("bar")
+            or session_info.get("bar_id")
+            or session_info.get("barId")
+            or bar_id_value
+        )
+    
     if bar_id_value is None:
-        # ❌ Don't silently default – fail loudly so we know what's wrong
-        raise UnknownBarError("Missing bar id in request payload")
+        bar_id = "demo-bar"
+    else:
+        bar_id = str(bar_id_value).strip() or "demo-bar"
 
-    bar_id = str(bar_id_value).strip()
+    session_id_value = (
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or (session_info.get("id") if session_info else None)
+        or (session_info.get("sessionId") if session_info else None)
+    )
+    session_id = str(session_id_value) if session_id_value is not None else None
 
     return bar_id, session_id
-
 
 
 def _json_error(message: str, status_code: int) -> Response:
@@ -172,12 +165,8 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             association_model=_ASSOCIATION_MODEL,
         )
     except UnknownBarError as exc:
-        # Log full traceback so we can see exactly why the bar failed
-        logger.exception("UnknownBarError during recipe generation")
         return _json_error(str(exc), 404)
     except ValueError as exc:
-        # Log full traceback for any generation logic issues
-        logger.exception("ValueError during recipe generation")
         return _json_error(str(exc), 400)
 
     ingredients_list = _format_ingredient_list(recipe)

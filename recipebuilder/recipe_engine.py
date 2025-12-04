@@ -679,6 +679,46 @@ def _normalize_identifier(value: str) -> str:
     return token.replace("__", "_")
 
 
+def _is_flavoured_spirit(ingredient: Ingredient) -> bool:
+    if _normalize(ingredient.category) != "spirit":
+        return False
+    name = _normalize(ingredient.name)
+    tags = {_normalize(tag) for tag in ingredient.flavour_tags}
+    flavour_markers = {
+        "flavoured",
+        "flavored",
+        "fruit",
+        "fruity",
+        "berry",
+        "tropical",
+        "vanilla",
+        "caramel",
+        "candy",
+        "sweet",
+        "coconut",
+        "spiced",
+        "peach",
+        "passion",
+        "orange",
+        "lemon",
+        "lime",
+    }
+    return "flavour" in name or "flavor" in name or bool(tags & flavour_markers)
+
+
+def _find_flavoured_spirits(
+    ingredients: Sequence[Ingredient],
+    *,
+    exclude: Optional[Sequence[Ingredient]] = None,
+) -> List[Ingredient]:
+    excluded = {_normalize(item.name) for item in exclude or ()}
+    return [
+        ing
+        for ing in ingredients
+        if _is_flavoured_spirit(ing) and _normalize(ing.name) not in excluded
+    ]
+
+
 _NEGATIVE_NOTE_PATTERN = re.compile(
     r"(?:no|avoid|without|allergic to|allergy to|can't have|cannot have|intolerant to|sensitive to)\s+([a-z0-9 ,/&-]+)"
 )
@@ -1219,6 +1259,69 @@ def _count_unique_juices(suggestions: Sequence[IngredientSuggestion]) -> int:
     )
 
 
+def _scale_role_total(
+    suggestions: Sequence[IngredientSuggestion],
+    role: str,
+    target_total: float,
+    *,
+    minimum: float = 4.0,
+) -> None:
+    if target_total <= 0:
+        return
+    items = [s for s in suggestions if _normalize(s.role) == _normalize(role)]
+    if not items:
+        return
+    current = sum(item.amount_ml for item in items if item.amount_ml > 0)
+    if current <= 0:
+        share = target_total / len(items)
+        for item in items:
+            item.amount_ml = max(minimum, share)
+        return
+    factor = target_total / current
+    for item in items:
+        item.amount_ml = max(minimum, item.amount_ml * factor)
+
+
+def _quantize_spirit_total(
+    suggestions: Sequence[IngredientSuggestion], target_spirit_ml: float
+) -> None:
+    spirits = [s for s in suggestions if _normalize(s.ingredient.category) == "spirit"]
+    if not spirits or target_spirit_ml <= 0:
+        return
+    current = sum(s.amount_ml for s in spirits if s.amount_ml > 0)
+    if current <= 0:
+        spirits[0].amount_ml = target_spirit_ml
+        return
+    scale = target_spirit_ml / current
+    if scale <= 0:
+        return
+    for spirit in spirits:
+        spirit.amount_ml = max(10.0, spirit.amount_ml * scale)
+    adjusted_total = sum(s.amount_ml for s in spirits if s.amount_ml > 0)
+    if adjusted_total <= 0:
+        return
+    correction = target_spirit_ml - adjusted_total
+    if abs(correction) > 0.5:
+        share = correction / len(spirits)
+        for spirit in spirits:
+            spirit.amount_ml = max(10.0, spirit.amount_ml + share)
+
+
+def _cap_citrus_acidity(suggestions: Sequence[IngredientSuggestion]) -> None:
+    citrus_terms = {"lemon", "lime"}
+    citrus_juices = [
+        s
+        for s in suggestions
+        if s.role == "juice" and any(term in _normalize(s.ingredient.name) for term in citrus_terms)
+    ]
+    if not citrus_juices:
+        return
+    multiple_juices = _count_unique_juices(suggestions) > 1
+    for juice in citrus_juices:
+        if multiple_juices:
+            juice.amount_ml = min(juice.amount_ml, 15.0)
+
+
 def _default_amount(category: str, ingredient: Ingredient, role: str) -> float:
     category = _normalize(category)
     if ingredient.default_measure_ml:
@@ -1242,11 +1345,11 @@ def _determine_glassware(responses: Dict[str, str]) -> str:
     season = _normalize(responses.get("season", ""))
 
     if style in {"fine dining", "tasting menu"}:
-        return "Martini glass"
-    if season in {"summer", "spring", "al fresco"}:
-        return "Long Glass"
-    if house in {"rustic"}:
         return "Short glass"
+    if season in {"summer", "spring", "al fresco"}:
+        return "Chilled coupe"
+    if house in {"rustic"}:
+        return "Long glass"
     return "Double old fashioned"
 
 
@@ -1577,6 +1680,38 @@ def generate_cocktail_recipe(
         flavour_knowledge.enrich_ingredient(item)
 
     plan = build_preference_plan(responses)
+    carbonation_choice = _normalize(responses.get("carbonation_texture") or "")
+    abv_lane_choice = _normalize(responses.get("abv_lane") or "")
+    target_spirit_ml = 40.0
+    if abv_lane_choice in {"strong", "high"}:
+        target_spirit_ml = 50.0
+    elif abv_lane_choice == "low":
+        target_spirit_ml = 25.0
+    plan.strength_oz = target_spirit_ml / 29.5735
+    lengthener_rules = dict(getattr(plan, "lengthener_rules", {}) or {})
+    if carbonation_choice == "still & silky":
+        lengthener_rules["allow_carbonated"] = False
+        lengthener_rules["require_carbonated"] = False
+        plan.lengthener_allowed = True
+        plan.juice_max_count = min(plan.juice_max_count, 2)
+    elif carbonation_choice == "lightly fizzy":
+        lengthener_rules["allow_carbonated"] = True
+        plan.lengthener_allowed = True
+        preferred: List[str] = []
+        bitterness_level = plan.bitterness_tolerance or 0.0
+        if bitterness_level >= 0.55:
+            preferred = ["tonic water", "lemonade", "soda water"]
+        else:
+            preferred = ["lemonade", "soda water", "tonic water"]
+        lengthener_rules["preferred"] = tuple(preferred)
+        plan.juice_max_count = min(plan.juice_max_count, 2)
+    elif carbonation_choice == "properly sparkling":
+        lengthener_rules["allow_carbonated"] = True
+        lengthener_rules["require_carbonated"] = True
+        plan.lengthener_allowed = True
+        lengthener_rules["preferred"] = ("lemonade", "soda water", "tonic water")
+        plan.juice_max_count = min(plan.juice_max_count, 2)
+    plan.lengthener_rules = lengthener_rules
     logger.debug(
         "Built preference plan: glass=%s, templates=%s, juice_max=%s, lengthener=%s",
         plan.glass_type,
@@ -1636,6 +1771,8 @@ def generate_cocktail_recipe(
     sweeteners_pool = [
         ing for ing in _find_candidates_by_category(ingredients, "syrup", "sweetener") if ing != base
     ]
+    if not sweeteners_pool:
+        sweeteners_pool = _find_flavoured_spirits(ingredients, exclude=[base])
     juices_pool = [
         ing for ing in _find_candidates_by_category(ingredients, "juice", "citrus") if ing != base
     ]
@@ -1692,7 +1829,7 @@ def generate_cocktail_recipe(
         raise ValueError("Bar stock does not include suitable juices for this serve.")
 
     used_juice_names: Set[str] = set()
-    max_juices = getattr(plan, "juice_max_count", 3)
+    max_juices = min(getattr(plan, "juice_max_count", 3), 2)
 
     primary_juice = _select_juice_candidate(
         juices_pool,
@@ -1718,6 +1855,10 @@ def generate_cocktail_recipe(
         _default_amount(primary_juice.category, primary_juice, "juice"),
         base_reference_ml * 0.8,
     )
+    if carbonation_choice == "properly sparkling":
+        primary_amount = min(primary_amount, max(30.0, target_spirit_ml * 0.6))
+    elif carbonation_choice == "still & silky":
+        primary_amount = min(primary_amount, max(25.0, target_spirit_ml * 0.5))
     primary_amount = min(primary_amount, 90.0)
     suggestions.append(IngredientSuggestion(primary_juice, primary_amount, "juice"))
     primary_juice_name = primary_juice.name
@@ -1788,6 +1929,21 @@ def generate_cocktail_recipe(
             for suggestion in suggestions:
                 suggestion.amount_ml *= scale
 
+    juice_total = sum(s.amount_ml for s in suggestions if s.role == "juice")
+    if carbonation_choice == "still & silky":
+        _scale_role_total(suggestions, "juice", target_spirit_ml * 0.5, minimum=10.0)
+        _scale_role_total(suggestions, "sweetener", target_spirit_ml * 0.5, minimum=8.0)
+        _scale_role_total(suggestions, "modifier", target_spirit_ml * 0.5, minimum=8.0)
+    elif carbonation_choice == "lightly fizzy":
+        desired_juice = max(target_spirit_ml * 0.7, juice_total)
+        _scale_role_total(suggestions, "juice", desired_juice, minimum=12.0)
+    elif carbonation_choice == "properly sparkling":
+        desired_juice = min(juice_total, max(25.0, target_spirit_ml * 0.6))
+        _scale_role_total(suggestions, "juice", desired_juice, minimum=10.0)
+
+    _quantize_spirit_total(suggestions, target_spirit_ml)
+    _cap_citrus_acidity(suggestions)
+
     template_candidates = flavour_knowledge.select_templates_for_target(
         target_vector,
         target_tags=target_tag_weights,
@@ -1839,18 +1995,32 @@ def generate_cocktail_recipe(
     total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)
     top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
     lengthener_rules = getattr(plan, "lengthener_rules", {}) or {}
+    preferred_lengthener_override: Optional[str] = None
+    if carbonation_choice == "lightly fizzy":
+        preferred_lengthener_override = (
+            "tonic water" if (plan.bitterness_tolerance or 0.0) >= 0.55 else "lemonade"
+        )
+    elif carbonation_choice == "properly sparkling":
+        preferred_lengthener_override = "lemonade"
     if top_up_needed > 15 and (plan.lengthener_allowed is not False):
         require_carbonated = bool(lengthener_rules.get("require_carbonated"))
         unique_juices = _count_unique_juices(suggestions)
         allow_new_unique = unique_juices < max_juices or require_carbonated
         candidate: Optional[Ingredient] = None
         reused_suggestion: Optional[IngredientSuggestion] = None
-        if not require_carbonated:
+        if not require_carbonated and carbonation_choice == "still & silky":
             for suggestion in suggestions:
                 if suggestion.role == "juice":
                     candidate = suggestion.ingredient
                     reused_suggestion = suggestion
                     break
+        if candidate is None and preferred_lengthener_override:
+            matched = _match_named_ingredient(
+                juices_pool,
+                preferred_lengthener_override,
+            )
+            if matched:
+                candidate = matched
         if candidate is None and allow_new_unique:
             candidate = _select_lengthener_candidate(
                 juices_pool,
@@ -1865,6 +2035,10 @@ def generate_cocktail_recipe(
             )
         if candidate:
             addition_amount = max(top_up_needed, 40.0)
+            if carbonation_choice == "properly sparkling":
+                addition_amount = max(addition_amount, max(plan.glass_min_ml * 0.5, 90.0))
+            elif carbonation_choice == "lightly fizzy":
+                addition_amount = max(addition_amount, 60.0)
             normalized_name = _normalize(candidate.name)
             if reused_suggestion is not None:
                 reused_suggestion.amount_ml += addition_amount
@@ -1888,11 +2062,16 @@ def generate_cocktail_recipe(
             preferred = plan.lengthener_rules.get("preferred")
             if preferred:
                 fallback_name = str(preferred[0])
+        if preferred_lengthener_override:
+            fallback_name = preferred_lengthener_override
         if not fallback_name:
             fallback_name = "seasonal juice"
         lengthener_note = (
             f"Top up with {top_up_needed:.0f} ml chilled {fallback_name.lower()} to finish the serve."
         )
+
+    _quantize_spirit_total(suggestions, target_spirit_ml)
+    _cap_citrus_acidity(suggestions)
 
     final_payload = [(s.ingredient, s.amount_ml) for s in suggestions if s.amount_ml > 0]
     final_similarity = compute_recipe_similarity(
@@ -1978,6 +2157,16 @@ def _build_steps(
 
     steps.append("Shake vigorously for 10-12 seconds and fine strain into the chilled glass.")
     steps.append(f"Serve over {ice.lower()} in the {glassware.lower()}.")
+
+    syrup_names = [
+        s.ingredient.name
+        for s in suggestions
+        if s.role == "sweetener" and _normalize(s.ingredient.category) in {"syrup", "sweetener"}
+    ]
+    if syrup_names:
+        steps.append(
+            f"Drizzle {syrup_names[0].lower()} over the top for colour contrast before serving."
+        )
 
     if garnish:
         steps.append(f"Garnish with {garnish.lower()} just before serving.")
