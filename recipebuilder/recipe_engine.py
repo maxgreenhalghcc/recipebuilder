@@ -1242,11 +1242,11 @@ def _determine_glassware(responses: Dict[str, str]) -> str:
     season = _normalize(responses.get("season", ""))
 
     if style in {"fine dining", "tasting menu"}:
-        return "Nick & Nora glass"
+        return "Martini glass"
     if season in {"summer", "spring", "al fresco"}:
-        return "Chilled coupe"
+        return "Long Glass"
     if house in {"rustic"}:
-        return "Rocks glass"
+        return "Short glass"
     return "Double old fashioned"
 
 
@@ -1570,7 +1570,7 @@ def generate_cocktail_recipe(
     if association_model is None:
         association_model = _load_default_association_model()
 
-    ingredients = repository.load_bar_stock(bar_id)
+    ingredients = repository.load_bar_stock(bar)
 
     flavour_knowledge = _load_flavour_knowledge()
     for item in ingredients:
