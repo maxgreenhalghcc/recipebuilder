@@ -2,7 +2,6 @@
   "bar": "the point",
   "ingredients": [
 
-    /* ─────────────── SPIRITS & LIQUEURS ─────────────── */
 
     {
       "name": "Pink Grapefruit Gin",
@@ -95,7 +94,7 @@
       "default_measure_ml": 20
     },
 
-    /* ─────────────── SYRUPS ─────────────── */
+
 
     {
       "name": "Grenadine",
