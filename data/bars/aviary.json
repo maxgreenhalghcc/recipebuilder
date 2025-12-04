@@ -305,6 +305,34 @@
       "default_measure_ml": 15
     },
     {
+      "name": "Passion Fruit Puree",
+      "category": "modifier",
+      "flavour_tags": ["tropical", "exotic"],
+      "profiles": ["tropical", "exotic"],
+      "aromas": ["sweet"],
+      "seasons": ["summer", "winter"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "White Peach Puree",
+      "category": "modifier",
+      "flavour_tags": ["fresh", "fruity"],
+      "profiles": ["fresh", "fruity"],
+      "aromas": ["peach", "floral"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Strawberry Puree",
+      "category": "modifier",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["berry", "sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 20
+    }
+
+    {
       "name": "Elderflower Cordial",
       "category": "syrup",
       "flavour_tags": ["fresh", "floral"],
@@ -369,7 +397,6 @@
       "seasons": ["autumn"],
       "default_measure_ml": 25
     },
-
     {
       "name": "Lemonade",
       "category": "juice",
