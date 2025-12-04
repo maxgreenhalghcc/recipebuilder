@@ -2,7 +2,7 @@
   "bar": "rebel",
   "ingredients": [
 
-    /* ─────────────── SPIRITS ─────────────── */
+   #/* ─────────────── SPIRITS ─────────────── */
 
     {
       "name": "Smirnoff Red Vodka",
