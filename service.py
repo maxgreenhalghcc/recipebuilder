@@ -108,11 +108,22 @@ def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[
     """Determine the bar ID and session ID from the request payload."""
 
     session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
-
-    bar_id_value = payload.get("bar_id") or payload.get("barId")
+    
+    # Prefer `bar`, then fall back to bar_id / barId
+    bar_id_value = (
+        payload.get("bar")
+        or payload.get("bar_id")
+        or payload.get("barId")
+    )
+    
     if session_info:
-        bar_id_value = session_info.get("barId") or session_info.get("bar_id") or bar_id_value
-
+        bar_id_value = (
+            session_info.get("bar")
+            or session_info.get("bar_id")
+            or session_info.get("barId")
+            or bar_id_value
+        )
+    
     if bar_id_value is None:
         bar_id = "demo-bar"
     else:
