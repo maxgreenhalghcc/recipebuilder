@@ -9,6 +9,7 @@ from statistics import mean
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
 import re
+import logging
 
 from recipebuilder.preferences import PreferencePlan, build_preference_plan, collect_profile_tags
 from recipebuilder.flavour_context import (
