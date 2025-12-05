@@ -5,7 +5,7 @@
 
 
     {
-      "name": "Absolut Blue",
+      "name": "Absolut Vodka",
       "category": "spirit",
       "flavour_tags": ["clean", "smooth"],
       "profiles": ["clean", "smooth"],
@@ -61,7 +61,7 @@
 
 
     {
-      "name": "Beefeater",
+      "name": "Beefeater Gin",
       "category": "spirit",
       "flavour_tags": ["botanical", "fresh"],
       "profiles": ["botanical", "fresh"],
@@ -91,7 +91,7 @@
 
 
     {
-      "name": "Bacardi",
+      "name": "Bacardi Rum",
       "category": "spirit",
       "flavour_tags": ["tropical", "light"],
       "profiles": ["tropical", "light"],
