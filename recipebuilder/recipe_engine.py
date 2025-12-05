@@ -11,6 +11,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
 import re
 import logging
+import random
 
 from recipebuilder.preferences import PreferencePlan, build_preference_plan, collect_profile_tags
 from recipebuilder.flavour_context import (
@@ -1661,11 +1662,16 @@ def generate_cocktail_recipe(
     bar_id: str,
     repository: Optional[StockRepository] = None,
     association_model: Optional[FlavourAssociationModel] = None,
+    seed: Optional[int] = None,
     recipe_name: str = "Signature Serve",
 ) -> CocktailRecipe:
     """Generate a personalized cocktail recipe for the specified bar stock."""
 
     logger.info("Starting recipe generation for bar '%s'", bar_id)
+
+    # Per-request random generator (so /generate?seed=... is reproducible)
+    rng = random.Random(seed) if seed is not None else random
+
 
     if repository is None:
         repository = StockRepository()
@@ -1949,17 +1955,26 @@ def generate_cocktail_recipe(
         target_tags=target_tag_weights,
         plan=plan,
     )
-    selected_template = template_candidates[0] if template_candidates else None
+    if template_candidates:
+        # 70% of the time: keep current behaviour (best template)
+        # 30% of the time: use the 2nd-best, if it exists
+        if len(template_candidates) == 1 or rng.random() < 0.7:
+            selected_template = template_candidates[0]
+        else:
+            selected_template = template_candidates[1]
+    else:
+        selected_template = None
+    
     template_feedback = {}
     if selected_template is not None:
-        template_feedback = _apply_template_guidance(
-            suggestions,
-            selected_template,
-            knowledge=flavour_knowledge,
-            target_vector=target_vector,
-            control_tags=control_set,
-            plan=plan,
-        )
+    template_feedback = _apply_template_guidance(
+        suggestions,
+        selected_template,
+        knowledge=flavour_knowledge,
+        target_vector=target_vector,
+        control_tags=control_set,
+        plan=plan,
+    )
 
     _ensure_palate_balance(suggestions, plan)
 
