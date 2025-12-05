@@ -1955,16 +1955,8 @@ def generate_cocktail_recipe(
         target_tags=target_tag_weights,
         plan=plan,
     )
-    if template_candidates:
-        # 70% of the time: keep current behaviour (best template)
-        # 30% of the time: use the 2nd-best, if it exists
-        if len(template_candidates) == 1 or rng.random() < 0.7:
-            selected_template = template_candidates[0]
-        else:
-            selected_template = template_candidates[1]
-    else:
-        selected_template = None
     
+    selected_template = template_candidates[0] if template_candidates else None
     template_feedback = {}
     if selected_template is not None:
         template_feedback = _apply_template_guidance(
@@ -1975,6 +1967,7 @@ def generate_cocktail_recipe(
             control_tags=control_set,
             plan=plan,
         )
+
 
     _ensure_palate_balance(suggestions, plan)
 
