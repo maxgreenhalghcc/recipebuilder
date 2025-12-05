@@ -1212,17 +1212,17 @@ def _match_base_spirit(
     logger.info("Plan base spirit hint: %s", getattr(plan, "base_spirit", None))
     logger.info("Response base_spirit: %s", base_spirit)
     if base_spirit:
-    target_name = _normalize(base_spirit)
-    for ing in ingredients:
-        if (
-            ing.category == "spirit"
-            and _normalize(ing.name) == target_name
-        ):
-            logger.info(
-                "Base spirit forced to exact match: %s",
-                ing.name,
-            )
-            return ing
+        target_name = _normalize(base_spirit)
+        for ing in ingredients:
+            if (
+                ing.category == "spirit"
+                and _normalize(ing.name) == target_name
+            ):
+                logger.info(
+                    "Base spirit forced to exact match: %s",
+                    ing.name,
+                )
+                return ing
     target = _normalize(base_spirit)
 
     def _predicate(ing: Ingredient) -> bool:
