@@ -11,7 +11,6 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 import json
 import re
 import logging
-import random
 
 from recipebuilder.preferences import PreferencePlan, build_preference_plan, collect_profile_tags
 from recipebuilder.flavour_context import (
@@ -1668,10 +1667,6 @@ def generate_cocktail_recipe(
     """Generate a personalized cocktail recipe for the specified bar stock."""
 
     logger.info("Starting recipe generation for bar '%s'", bar_id)
-
-    # Per-request random generator (so /generate?seed=... is reproducible)
-    rng = random.Random(seed) if seed is not None else random
-
 
     if repository is None:
         repository = StockRepository()
