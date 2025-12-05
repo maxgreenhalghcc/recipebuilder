@@ -58,6 +58,51 @@
       "default_measure_ml": 50
     },
     {
+      "name": "Passion Fruit Juice",
+      "category": "juice",
+      "flavour_tags": ["exotic", "indulgent"],
+      "profiles": ["exotic", "indulgent"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Pineapple Juice",
+      "category": "juice",
+      "flavour_tags": ["tropical", "vibrant"],
+      "profiles": ["tropical", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Orange Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["spring"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Cranberry Juice",
+      "category": "juice",
+      "flavour_tags": ["dry", "subtle"],
+      "profiles": ["dry", "subtle"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Lemonade",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 25
+    },
+    {
       "name": "Bacardi",
       "category": "spirit",
       "flavour_tags": ["tropical", "light"],
