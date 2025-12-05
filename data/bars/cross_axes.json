@@ -29,6 +29,15 @@
       "default_measure_ml": 50
     },
     {
+      "name": "Tequila",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
       "name": "Bourbon",
       "category": "spirit",
       "flavour_tags": ["indulgent", "warm", "classic"],
