@@ -13,6 +13,42 @@
       "default_measure_ml": 50
     },
     {
+      "name": "Vodka",
+      "category": "spirit",
+      "flavour_tags": ["clean", "zesty", "vibrant"],
+      "profiles": ["clean", "zesty", "vibrant"],
+      "aromas": ["citrus", "sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Gin",
+      "category": "spirit",
+      "flavour_tags": ["botanical", "fresh", "floral"],
+      "profiles": ["botanical", "fresh", "floral"],
+      "aromas": ["floral", "citrus"],
+      "seasons": ["spring"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Rum",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "rich", "fruity"],
+      "profiles": ["tropical", "rich", "fruity"],
+      "aromas": ["sweet"],
+      "seasons": ["summer", "autumn"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Tequila",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    }, 
+    {
       "name": "Smirnoff Vanilla Vodka",
       "category": "spirit",
       "flavour_tags": ["rich", "classic"],
