@@ -156,6 +156,8 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     logger.info("Received generation request for bar=%s session=%s", bar_id, session_id)
     reserved_keys = {"bar_id", "barId", "session", "session_id", "sessionId"}
     responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
+    seed_value = payload.get("seed")
+
 
     try:
         recipe = generate_cocktail_recipe(
@@ -163,6 +165,7 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             bar_id=bar_id,
             repository=_REPOSITORY,
             association_model=_ASSOCIATION_MODEL,
+            seed=seed_value,
         )
     except UnknownBarError as exc:
         return _json_error(str(exc), 404)
