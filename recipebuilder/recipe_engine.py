@@ -1060,6 +1060,12 @@ def _select_best_match(
         target_vector=target_vector,
         plan=plan,
     )
+    if category == "spirit" and role == "base":
+    logger.info(
+        "Candidate spirits: %s",
+        [ing.name for ing in candidates],
+    )
+
     return ranked[0][0] if ranked else None
 
 
@@ -1203,6 +1209,8 @@ def _match_base_spirit(
     target_vector: Optional[FlavourVector] = None,
     plan: Optional[PreferencePlan] = None,
 ) -> Optional[Ingredient]:
+    logger.info("Plan base spirit hint: %s", getattr(plan, "base_spirit", None))
+    logger.info("Response base_spirit: %s", base_spirit)
     target = _normalize(base_spirit)
 
     def _predicate(ing: Ingredient) -> bool:
