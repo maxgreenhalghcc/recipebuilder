@@ -1061,10 +1061,10 @@ def _select_best_match(
         plan=plan,
     )
     if category == "spirit" and role == "base":
-    logger.info(
-        "Candidate spirits: %s",
-        [ing.name for ing in candidates],
-    )
+        logger.info(
+            "Candidate spirits: %s",
+            [ing.name for ing in candidates],
+        )
 
     return ranked[0][0] if ranked else None
 
