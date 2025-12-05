@@ -1967,14 +1967,14 @@ def generate_cocktail_recipe(
     
     template_feedback = {}
     if selected_template is not None:
-    template_feedback = _apply_template_guidance(
-        suggestions,
-        selected_template,
-        knowledge=flavour_knowledge,
-        target_vector=target_vector,
-        control_tags=control_set,
-        plan=plan,
-    )
+        template_feedback = _apply_template_guidance(
+            suggestions,
+            selected_template,
+            knowledge=flavour_knowledge,
+            target_vector=target_vector,
+            control_tags=control_set,
+            plan=plan,
+        )
 
     _ensure_palate_balance(suggestions, plan)
 
