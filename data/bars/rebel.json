@@ -141,33 +141,6 @@
       "default_measure_ml": 20
     },
     {
-      "name": "Baileys",
-      "category": "modifier",
-      "flavour_tags": ["indulgent", "creamy"],
-      "profiles": ["indulgent", "creamy"],
-      "aromas": ["sweet"],
-      "seasons": ["winter"],
-      "default_measure_ml": 25
-    },
-    {
-      "name": "Kahlua",
-      "category": "modifier",
-      "flavour_tags": ["rich", "earthy"],
-      "profiles": ["rich", "earthy"],
-      "aromas": ["coffee"],
-      "seasons": ["winter"],
-      "default_measure_ml": 25
-    },
-    {
-      "name": "Tia Maria",
-      "category": "modifier",
-      "flavour_tags": ["rich", "sweet"],
-      "profiles": ["rich", "sweet"],
-      "aromas": ["coffee", "vanilla"],
-      "seasons": ["winter"],
-      "default_measure_ml": 25
-    },
-    {
       "name": "Tequila Rose",
       "category": "modifier",
       "flavour_tags": ["creamy", "sweet"],
