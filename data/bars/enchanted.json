@@ -1,5 +1,5 @@
 {
-  "enchanted": {
+  "enchanted-bar": {
     "flavour_matrix": [
       { "type": "spirit", "name": "normal gin", "seasons": ["spring"], "aromas": ["floral", "citrus"], "profiles": ["botanical", "fresh", "floral"] },
       { "type": "spirit", "name": "pink gin", "seasons": ["spring"], "aromas": ["floral"], "profiles": ["fruity", "romantic"] },
