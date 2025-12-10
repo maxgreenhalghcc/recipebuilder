@@ -4,8 +4,9 @@ from .recipe_engine import CocktailRecipe
 from .recipe_engine import FlavourAssociationModel
 from .recipe_engine import FlavourAssociationObservation
 from .recipe_engine import IngredientSuggestion
-from .recipe_engine import StockRepository
+from .recipe_engine import StockItem, StockRepository
 from .recipe_engine import generate_cocktail_recipe
+from .profile_builder import ProfileRecipeBuilder, choose_profile
 from .training import CocktailTrainingIngredient
 from .training import CocktailTrainingSample
 from .training import build_observations_from_samples
@@ -20,7 +21,10 @@ __all__ = [
     "FlavourAssociationModel",
     "FlavourAssociationObservation",
     "IngredientSuggestion",
+    "StockItem",
     "StockRepository",
+    "ProfileRecipeBuilder",
+    "choose_profile",
     "generate_cocktail_recipe",
     "CocktailTrainingIngredient",
     "CocktailTrainingSample",

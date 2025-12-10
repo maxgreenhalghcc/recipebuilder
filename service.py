@@ -108,22 +108,11 @@ def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[
     """Determine the bar ID and session ID from the request payload."""
 
     session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
-    
-    # Prefer `bar`, then fall back to bar_id / barId
-    bar_id_value = (
-        payload.get("bar")
-        or payload.get("bar_id")
-        or payload.get("barId")
-    )
-    
+
+    bar_id_value = payload.get("bar_id") or payload.get("barId")
     if session_info:
-        bar_id_value = (
-            session_info.get("bar")
-            or session_info.get("bar_id")
-            or session_info.get("barId")
-            or bar_id_value
-        )
-    
+        bar_id_value = session_info.get("barId") or session_info.get("bar_id") or bar_id_value
+
     if bar_id_value is None:
         bar_id = "demo-bar"
     else:
@@ -156,8 +145,6 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     logger.info("Received generation request for bar=%s session=%s", bar_id, session_id)
     reserved_keys = {"bar_id", "barId", "session", "session_id", "sessionId"}
     responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
-    seed_value = payload.get("seed")
-
 
     try:
         recipe = generate_cocktail_recipe(
@@ -165,7 +152,6 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             bar_id=bar_id,
             repository=_REPOSITORY,
             association_model=_ASSOCIATION_MODEL,
-            seed=seed_value,
         )
     except UnknownBarError as exc:
         return _json_error(str(exc), 404)
