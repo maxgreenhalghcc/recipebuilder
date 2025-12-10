@@ -1,0 +1,165 @@
+[
+    {
+      "name": "Vodka",
+      "category": "spirit",
+      "flavour_tags": ["clean", "zesty", "vibrant"],
+      "profiles": ["clean", "zesty", "vibrant"],
+      "aromas": ["citrus", "sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Gin",
+      "category": "spirit",
+      "flavour_tags": ["botanical", "fresh", "floral"],
+      "profiles": ["botanical", "fresh", "floral"],
+      "aromas": ["floral", "citrus"],
+      "seasons": ["spring"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Rum",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "rich", "fruity"],
+      "profiles": ["tropical", "rich", "fruity"],
+      "aromas": ["sweet"],
+      "seasons": ["summer", "autumn"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Tequila",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50
+    },
+    {
+      "name": "Raspberry Syrup",
+      "category": "syrup",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["sweet", "berry"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Passion Fruit Syrup",
+      "category": "syrup",
+      "flavour_tags": ["tropical", "exotic"],
+      "profiles": ["tropical", "exotic"],
+      "aromas": ["sweet"],
+      "seasons": ["summer", "winter"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Grenadine",
+      "category": "syrup",
+      "flavour_tags": ["candy", "classic"],
+      "profiles": ["candy", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Vanilla Syrup",
+      "category": "syrup",
+      "flavour_tags": ["rich", "classic"],
+      "profiles": ["rich", "classic"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Caramel Syrup",
+      "category": "syrup",
+      "flavour_tags": ["indulgent", "rich"],
+      "profiles": ["indulgent", "rich"],
+      "aromas": ["sweet"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Strawberry Syrup",
+      "category": "syrup",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["fruity", "vibrant"],
+      "aromas": ["sweet", "berry"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Coconut Syrup",
+      "category": "syrup",
+      "flavour_tags": ["tropical", "creamy"],
+      "profiles": ["tropical", "creamy"],
+      "aromas": ["coconut"],
+      "seasons": ["summer"],
+      "default_measure_ml": 15
+    },
+    {
+      "name": "Passion Fruit Juice",
+      "category": "juice",
+      "flavour_tags": ["exotic", "indulgent"],
+      "profiles": ["exotic", "indulgent"],
+      "aromas": ["sweet"],
+      "seasons": ["winter"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Pineapple Juice",
+      "category": "juice",
+      "flavour_tags": ["tropical", "vibrant"],
+      "profiles": ["tropical", "vibrant"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Orange Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["spring"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Cranberry Juice",
+      "category": "juice",
+      "flavour_tags": ["dry", "subtle"],
+      "profiles": ["dry", "subtle"],
+      "aromas": ["woody"],
+      "seasons": ["autumn"],
+      "default_measure_ml": 25
+    },
+    {
+      "name": "Lemonade",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 25
+    },
+
+    {
+      "name": "Lemon Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "sharp"],
+      "profiles": ["zesty", "sharp"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 20
+    },
+    {
+      "name": "Lime Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["zesty", "fresh"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 20
+    }
+]
