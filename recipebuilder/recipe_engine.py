@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
 from statistics import mean
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, Literal, Optional, Sequence, Set, Tuple
 import json
 import re
 
@@ -141,10 +141,12 @@ class StockItem:
     """Profile-aware stock entry used by the rule-based recipe builder."""
 
     name: str
-    category: str
-    role: str
-    profiles: Set[str]
+    category: Literal["spirit", "syrup", "juice", "mixer", "sour", "modifier", "garnish"]
+    role: Literal["base", "sweetener", "juice", "mixer", "sour", "modifier", "garnish"]
+
+    profiles: Set[str] = field(default_factory=set)
     avoid_profiles: Set[str] = field(default_factory=set)
+
     neutral: bool = False
     flavour_tags: Sequence[str] = field(default_factory=list)
     default_measure_ml: float = 0.0
@@ -173,8 +175,8 @@ class StockItem:
 
         return cls(
             name=name,
-            category=category,
-            role=role,
+            category=category,  # type: ignore[arg-type]
+            role=role,  # type: ignore[arg-type]
             profiles=profiles,
             avoid_profiles=avoid_profiles,
             neutral=neutral,
@@ -720,6 +722,7 @@ class StockRepository:
         tags = {_normalize(tag) for tag in item.flavour_tags}
         name_tokens = _tokenize(item.name)
         profiles = set(item.profiles)
+        avoid_profiles = set(item.avoid_profiles)
 
         def add_profile_if(match: bool, profile: str) -> None:
             if match:
@@ -729,32 +732,45 @@ class StockRepository:
         add_profile_if(bool({"citrus", "zesty", "lemon", "lime", "orange", "fresh"} & (tags | set(name_tokens))), "citrus_fresh")
         add_profile_if(bool({"berry", "cranberry", "raspberry", "strawberry"} & (tags | set(name_tokens))), "berry")
         add_profile_if(bool({"bourbon", "whiskey", "whisky", "tequila", "classic", "smoky", "boozy"} & (tags | set(name_tokens))), "classic_boozy")
-        add_profile_if(bool({"candy", "grenadine", "blue", "vanilla", "caramel", "sweet"} & (tags | set(name_tokens))), "candy_fun")
-        add_profile_if(bool({"cream", "creamy", "cocoa", "coffee"} & (tags | set(name_tokens))), "creamy_dessert")
+        add_profile_if(bool({"candy", "grenadine", "blue", "bright"} & (tags | set(name_tokens))), "candy_fun")
+        add_profile_if(bool({"vanilla", "caramel", "dessert", "rich"} & (tags | set(name_tokens))), "dessert")
 
         neutral = item.neutral
-        if _normalize(item.name) in {"lemon juice", "lime juice", "soda water"}:
+        normalized_name = _normalize(item.name)
+        if normalized_name in {"lemon juice", "lime juice", "soda water"}:
             neutral = True
-        if _normalize(item.name) == "vodka":
+        if normalized_name == "vodka":
             neutral = True
 
-        role = item.role
-        if role == "juice" and _normalize(item.name) in {"lemon juice", "lime juice"}:
-            role = "sour"
+        if item.category == "juice":
+            if normalized_name in {"lemon juice", "lime juice"}:
+                item_role = "sour"
+            else:
+                item_role = item.role
+            if normalized_name == "orange juice":
+                avoid_profiles.update({"dessert", "candy_fun"})
+            if normalized_name in {"passion fruit juice", "pineapple juice"}:
+                profiles.update({"tropical", "dessert"})
+        else:
+            item_role = item.role
+
+        if normalized_name in {"vanilla syrup", "caramel syrup", "maple syrup"}:
+            profiles.update({"dessert", "tropical"})
+            avoid_profiles.update({"citrus_fresh", "classic_boozy", "candy_fun"})
 
         return StockItem(
             name=item.name,
             category=item.category,
-            role=role,
+            role=item_role,  # type: ignore[arg-type]
             profiles=profiles,
-            avoid_profiles=item.avoid_profiles,
+            avoid_profiles=avoid_profiles,
             neutral=neutral,
             flavour_tags=item.flavour_tags,
             default_measure_ml=item.default_measure_ml,
         )
 
     def items_for_profile(self, profile: str, *, role: str | None = None) -> List[StockItem]:
-        items = [item for item in self._cached_items.get(profile, []) if profile in item.profiles or item.neutral]
+        items = [item for item in self._cached_items.get(profile, []) if (profile in item.profiles or item.neutral) and profile not in item.avoid_profiles]
         if role:
             items = [item for item in items if item.role == role]
         return items
@@ -2328,8 +2344,6 @@ def generate_cocktail_recipe(
     from recipebuilder.profile_builder import ProfileRecipeBuilder, choose_profile
 
     profile = choose_profile(responses_with_bar)
-    if profile == "creamy_dessert":
-        profile = "tropical"
 
     repository.prime_cache(bar_id)
     builder = ProfileRecipeBuilder(repository)

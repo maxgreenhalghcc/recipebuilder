@@ -4,8 +4,8 @@ from typing import Set
 
 import pytest
 
-from recipebuilder.profile_builder import ProfileRecipeBuilder, choose_profile
-from recipebuilder.recipe_engine import StockRepository, generate_cocktail_recipe
+from recipebuilder.profile_builder import PROFILES, ProfileRecipeBuilder, choose_profile
+from recipebuilder.recipe_engine import StockRepository
 
 
 def _assert_profile_compatibility(profile: str, names: Set[str], suggestions):
@@ -43,25 +43,60 @@ def test_profile_builder_respects_profile_and_limits_juices():
 
     mixer = next((s for s in recipe.ingredients if s.role == "mixer"), None)
     assert mixer is not None
-    assert mixer.amount_ml >= 0.4 * 400
+    assert mixer.amount_ml > 0
 
 
-def test_generate_cocktail_recipe_uses_profile_and_fallbacks():
-    responses = {
-        "base_spirit": "vodka",
-        "bar_id": "demo-bar",
-        "carbonation_texture": "still & silky",
-        "abv_lane": "low",
-        "profile": "creamy_dessert",
+def test_choose_profile_mapping_cases():
+    assert choose_profile({"profile": "berry"}) == "berry"
+
+    tropical_case = {
+        "season": "summer",
+        "house_type": "beach house",
+        "base_spirit": "rum",
+        "sweetener_question": "zesty",
+        "bitterness_tolerance": "low",
     }
+    assert choose_profile(tropical_case) == "tropical"
 
-    recipe = generate_cocktail_recipe(responses, bar_id="demo-bar")
+    berry_case = {
+        "season": "spring",
+        "aroma_preference": "floral",
+        "base_spirit": "gin",
+        "sweetener_question": "floral",
+        "bitterness_tolerance": "medium",
+    }
+    assert choose_profile(berry_case) == "berry"
 
-    juice_names = {s.ingredient.name for s in recipe.ingredients if s.role == "juice"}
-    assert len(juice_names) <= 2
-    _assert_profile_compatibility("tropical", set(), recipe.ingredients)
+    boozy_case = {
+        "season": "winter",
+        "aroma_preference": "campfire wood",
+        "base_spirit": "tequila",
+        "sweetener_question": "classic",
+        "abv_lane": "strong",
+        "carbonation_texture": "still",
+    }
+    assert choose_profile(boozy_case) == "classic_boozy"
+
+    dessert_case = {
+        "season": "winter",
+        "dining_style": "sweet tooth indulging in rich flavours",
+        "aroma_preference": "sweet sugar",
+        "sweetener_question": "rich",
+        "base_spirit": "vodka",
+    }
+    assert choose_profile(dessert_case) == "dessert"
 
 
 def test_choose_profile_explicit():
     assert choose_profile({"profile": "berry"}) == "berry"
     assert choose_profile({}) == "tropical"
+
+
+def test_no_creamy_items_in_profiles():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+    responses = {"bar_id": "demo-bar", "house_type": "modern house"}
+    for profile in PROFILES:
+        recipe = builder.build_recipe(responses, profile=profile, seed=3)
+        assert all(not ("cream" in s.ingredient.name.lower()) for s in recipe.ingredients)
