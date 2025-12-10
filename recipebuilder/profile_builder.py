@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from recipebuilder.recipe_engine import CocktailRecipe, IngredientSuggestion, StockItem
+from recipebuilder.recipe_engine import (
+    CocktailRecipe,
+    IngredientSuggestion,
+    StockItem,
+    extract_flavour_keywords,
+    extract_spirit_family,
+)
 
 
 @dataclass
@@ -24,6 +30,15 @@ PROFILES = [
     "candy_fun",
     "dessert",
 ]
+
+PROFILE_FLAVOUR_WORDS: Dict[str, List[str]] = {
+    "tropical": ["passion", "pineapple", "mango", "coconut", "orange"],
+    "citrus_fresh": ["lemon", "lime", "orange", "grapefruit"],
+    "berry": ["raspberry", "strawberry", "berry", "cranberry"],
+    "classic_boozy": ["orange", "grapefruit"],
+    "candy_fun": ["blue", "raspberry", "strawberry", "cherry", "berry"],
+    "dessert": ["vanilla", "caramel", "toffee", "passion", "pineapple"],
+}
 
 
 def choose_profile(responses: Dict[str, Any]) -> str:
@@ -234,19 +249,43 @@ class ProfileRecipeBuilder:
         if base is None:
             raise ValueError("No base spirit available for the selected profile.")
 
+        base_family = extract_spirit_family(base.name) or ""
+
         juices = self._choose_juices(profile_items("juice"), prefs["juice_keywords"], limit=2)
-        sweetener = self._choose_sweetener(profile_items("sweetener"), prefs["sweetener_keywords"], profile_items("base"))
+        sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
+            profile,
+            base_family,
+            profile_items("sweetener"),
+            profile_items("base"),
+            abv_lane,
+            rnd,
+        )
         modifier = self._choose_modifier(profile_items("modifier"), prefs["modifier_keywords"])
         sour = self._maybe_add_sour(profile, profile_items("sour"), prefs["needs_sour"])
 
-        sweet_ml = rnd.uniform(12, 18) if sweetener else 0.0
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
+
         base_ml = base_target - modifier_ml
-        base_ml = max(40.0, base_ml) if abv_lane != "low" else max(25.0, base_ml)
+        if flavoured_spirit and flavoured_spirit.category == "spirit":
+            base_ml = max(25.0, base_target - flavoured_ml)
+        if abv_lane == "low":
+            base_ml = max(25.0, min(base_ml, 40.0))
+        else:
+            base_ml = max(40.0, min(base_ml, 60.0))
+
+        if flavoured_spirit and flavoured_spirit.category == "spirit":
+            total_spirits = base_ml + flavoured_ml
+            if total_spirits > 60.0:
+                excess = total_spirits - 60.0
+                base_ml = max(25.0, base_ml - excess)
+            if total_spirits < 40.0:
+                base_ml = max(25.0, 40.0 - flavoured_ml)
+
         juice_amounts = self._assign_juice_amounts(juices, carbonation, prefs["juice_ml"])
 
-        core_volume = base_ml + modifier_ml + sweet_ml + sour_ml + sum(juice_amounts)
+        spirit_extra = flavoured_ml if flavoured_spirit and flavoured_spirit.category == "spirit" else 0.0
+        core_volume = base_ml + modifier_ml + sweet_ml + sour_ml + sum(juice_amounts) + spirit_extra
         mixer_item: Optional[StockItem] = None
         mixer_ml = 0.0
         if glass.sparkling:
@@ -262,6 +301,9 @@ class ProfileRecipeBuilder:
                 mixer_ml = max(25.0, glass.capacity_ml - core_volume)
 
         suggestions: List[IngredientSuggestion] = [IngredientSuggestion(base, base_ml, "base")]
+        if flavoured_spirit:
+            role = flavoured_spirit.role if flavoured_spirit.role in {"modifier", "base"} else "modifier"
+            suggestions.append(IngredientSuggestion(flavoured_spirit, flavoured_ml, role))
         if modifier:
             suggestions.append(IngredientSuggestion(modifier, modifier_ml, "modifier"))
         if sweetener:
@@ -306,8 +348,8 @@ class ProfileRecipeBuilder:
             "tropical": {
                 "base_keywords": ["rum", "vodka"],
                 "juice_keywords": ["pineapple", "orange", "passion"],
-                "sweetener_keywords": ["grenadine", "vanilla", "passion"],
-                "modifier_keywords": ["liqueur", "schnapps"],
+                "sweetener_keywords": ["grenadine", "vanilla", "passion", "coconut"],
+                "modifier_keywords": ["liqueur", "schnapps", "falernum"],
                 "mixer_keywords": ["lemonade"],
                 "garnish_keywords": ["orange", "pineapple", "mint"],
             },
@@ -332,7 +374,7 @@ class ProfileRecipeBuilder:
                 "mixer_keywords": [],
                 "garnish_keywords": ["orange", "twist"],
                 "needs_sour": False,
-                "juice_ml": (20.0, 30.0),
+                "juice_ml": (15.0, 30.0),
             },
             "candy_fun": {
                 "base_keywords": ["vodka", "gin"],
@@ -350,7 +392,7 @@ class ProfileRecipeBuilder:
                 "garnish_keywords": ["orange", "passion", "cherry"],
                 "needs_sour": True,
                 "sour_ml": 10.0,
-                "juice_ml": (20.0, 35.0),
+                "juice_ml": (20.0, 30.0),
             },
         }
         return {**defaults, **profiles.get(profile, {})}
@@ -389,12 +431,59 @@ class ProfileRecipeBuilder:
                 break
         return picks[:limit]
 
-    def _choose_sweetener(self, sweeteners: Sequence[StockItem], keywords: Sequence[str], flavoured_bases: Sequence[StockItem]) -> Optional[StockItem]:
+    def _choose_sweet_components(
+        self,
+        profile: str,
+        base_family: str,
+        sweeteners: Sequence[StockItem],
+        base_pool: Sequence[StockItem],
+        abv_lane: str,
+        rnd: random.Random,
+    ) -> Tuple[Optional[StockItem], float, Optional[StockItem], float]:
         sweeteners = [s for s in sweeteners if not is_creamy(s)]
-        match = _pick_first_matching(sweeteners, keywords)
-        if match:
-            return match
-        return _pick_first_matching(flavoured_bases, keywords)
+        flavour_words = PROFILE_FLAVOUR_WORDS.get(profile, [])
+        matching_syrups = [s for s in sweeteners if any(word in s.name.lower() for word in flavour_words)]
+        neutral_syrups = [s for s in sweeteners if s not in matching_syrups]
+
+        flavoured_spirits: List[StockItem] = []
+        if base_family:
+            for word in flavour_words:
+                flavoured_spirits.extend(self.repository.find_flavoured_spirits(base_family, word, profile))
+
+        # Deduplicate flavoured spirits by name
+        unique_spirits: List[StockItem] = []
+        seen: set[str] = set()
+        for spirit in flavoured_spirits:
+            key = spirit.name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_spirits.append(spirit)
+        flavoured_spirits = unique_spirits
+
+        sweetener_pick: Optional[StockItem] = None
+        sweet_ml = 0.0
+        flavoured_pick: Optional[StockItem] = None
+        flavoured_ml = 0.0
+
+        if matching_syrups:
+            sweetener_pick = matching_syrups[0]
+            sweet_ml = rnd.uniform(12, 18)
+            if flavoured_spirits and abv_lane != "low":
+                flavoured_pick = flavoured_spirits[0]
+                flavoured_ml = 10.0 if abv_lane == "medium" else 15.0
+        elif flavoured_spirits:
+            flavoured_pick = flavoured_spirits[0]
+            flavoured_ml = 20.0 if abv_lane == "low" else 25.0
+        elif neutral_syrups:
+            sweetener_pick = neutral_syrups[0]
+            sweet_ml = rnd.uniform(10, 16)
+        else:
+            # Last resort: any base-adjacent item with a mild flavour (e.g. grenadine)
+            sweetener_pick = _pick_first_matching(base_pool, flavour_words)
+            sweet_ml = rnd.uniform(10, 14) if sweetener_pick else 0.0
+
+        return sweetener_pick, sweet_ml, flavoured_pick, flavoured_ml
 
     def _choose_modifier(self, modifiers: Sequence[StockItem], keywords: Sequence[str]) -> Optional[StockItem]:
         modifiers = [m for m in modifiers if not is_creamy(m)]
@@ -462,4 +551,6 @@ class ProfileRecipeBuilder:
                 raise ValueError(f"Ingredient {item.name} not compatible with profile {profile}")
             if profile in item.avoid_profiles:
                 raise ValueError(f"Ingredient {item.name} avoids profile {profile}")
+            if is_creamy(item):
+                raise ValueError(f"Ingredient {item.name} is creamy and not allowed")
 

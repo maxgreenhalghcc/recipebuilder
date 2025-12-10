@@ -717,56 +717,68 @@ class StockRepository:
         return stock_items
 
     def _enrich_stock_item(self, item: StockItem) -> StockItem:
-        """Infer profile compatibility, neutrality, and sensible defaults."""
+        """Normalise profile data, fill sensible defaults, and enforce bans."""
 
-        tags = {_normalize(tag) for tag in item.flavour_tags}
-        name_tokens = _tokenize(item.name)
-        profiles = set(item.profiles)
-        avoid_profiles = set(item.avoid_profiles)
+        name = item.name
+        normalized_name = _normalize(name)
+        category = _normalize(item.category)
+        role = _normalize(item.role)
+        if not role:
+            role = {
+                "spirit": "base",
+                "syrup": "sweetener",
+                "juice": "juice",
+                "mixer": "mixer",
+                "sour": "sour",
+                "modifier": "modifier",
+                "garnish": "garnish",
+            }.get(category, "modifier")
 
-        def add_profile_if(match: bool, profile: str) -> None:
-            if match:
-                profiles.add(profile)
+        default_measure = item.default_measure_ml
+        if not default_measure:
+            default_measure = {
+                "spirit": 50.0,
+                "syrup": 15.0,
+                "juice": 25.0,
+                "sour": 20.0,
+                "mixer": 75.0,
+                "modifier": 20.0,
+            }.get(category, 0.0)
 
-        add_profile_if(bool({"tropical", "pineapple", "passion", "coconut", "rum"} & (tags | set(name_tokens))), "tropical")
-        add_profile_if(bool({"citrus", "zesty", "lemon", "lime", "orange", "fresh"} & (tags | set(name_tokens))), "citrus_fresh")
-        add_profile_if(bool({"berry", "cranberry", "raspberry", "strawberry"} & (tags | set(name_tokens))), "berry")
-        add_profile_if(bool({"bourbon", "whiskey", "whisky", "tequila", "classic", "smoky", "boozy"} & (tags | set(name_tokens))), "classic_boozy")
-        add_profile_if(bool({"candy", "grenadine", "blue", "bright"} & (tags | set(name_tokens))), "candy_fun")
-        add_profile_if(bool({"vanilla", "caramel", "dessert", "rich"} & (tags | set(name_tokens))), "dessert")
+        profiles = {p.lower() for p in item.profiles}
+        avoid_profiles = {p.lower() for p in item.avoid_profiles}
+        neutral = bool(item.neutral)
 
-        neutral = item.neutral
-        normalized_name = _normalize(item.name)
-        if normalized_name in {"lemon juice", "lime juice", "soda water"}:
+        # Neutral staples
+        if normalized_name in {"lemon juice", "lime juice", "soda", "soda water", "club soda"}:
             neutral = True
-        if normalized_name == "vodka":
-            neutral = True
 
-        if item.category == "juice":
-            if normalized_name in {"lemon juice", "lime juice"}:
-                item_role = "sour"
-            else:
-                item_role = item.role
-            if normalized_name == "orange juice":
-                avoid_profiles.update({"dessert", "candy_fun"})
-            if normalized_name in {"passion fruit juice", "pineapple juice"}:
-                profiles.update({"tropical", "dessert"})
+        # Role tweak for sour juices
+        if category == "juice" and normalized_name in {"lemon juice", "lime juice"}:
+            category = "sour"
+            role = "sour"
+            default_measure = 20.0
+
+        # If profiles are missing, use heuristics similar to the stock migration rules.
+        if not profiles:
+            profiles, avoid_profiles, inferred_neutral = _assign_profile_defaults(normalized_name, category)
+            neutral = neutral or inferred_neutral
         else:
-            item_role = item.role
-
-        if normalized_name in {"vanilla syrup", "caramel syrup", "maple syrup"}:
-            profiles.update({"dessert", "tropical"})
-            avoid_profiles.update({"citrus_fresh", "classic_boozy", "candy_fun"})
+            # Apply guardrails from heuristics without overriding declared compatibility.
+            extra_profiles, extra_avoids, inferred_neutral = _assign_profile_defaults(normalized_name, category)
+            profiles.update(extra_profiles)
+            avoid_profiles.update(extra_avoids)
+            neutral = neutral or inferred_neutral
 
         return StockItem(
-            name=item.name,
-            category=item.category,
-            role=item_role,  # type: ignore[arg-type]
+            name=name,
+            category=category,  # type: ignore[arg-type]
+            role=role,  # type: ignore[arg-type]
             profiles=profiles,
             avoid_profiles=avoid_profiles,
             neutral=neutral,
             flavour_tags=item.flavour_tags,
-            default_measure_ml=item.default_measure_ml,
+            default_measure_ml=default_measure,
         )
 
     def items_for_profile(self, profile: str, *, role: str | None = None) -> List[StockItem]:
@@ -780,6 +792,30 @@ class StockRepository:
         if role:
             items = [item for item in items if item.role == role]
         return items
+
+    def find_flavoured_spirits(
+        self,
+        base_family: str,
+        flavour: str,
+        profile: str | None = None,
+    ) -> List[StockItem]:
+        """Return flavoured spirits matching the family/flavour and profile compatibility."""
+
+        flavour = _normalize(flavour)
+        results: List[StockItem] = []
+        for item in self._all_items:
+            if item.category != "spirit":
+                continue
+            if _is_creamy_name(item.name):
+                continue
+            if extract_spirit_family(item.name) != base_family:
+                continue
+            if flavour not in extract_flavour_keywords(item.name):
+                continue
+            if profile and (profile in item.avoid_profiles or (profile not in item.profiles and not item.neutral)):
+                continue
+            results.append(item)
+        return results
 
     @property
     def _all_items(self) -> List[StockItem]:  # pragma: no cover - simple helper
@@ -823,6 +859,140 @@ def _normalize_identifier(value: str) -> str:
     filtered = [ch if ch.isalnum() or ch == "_" else "_" for ch in normalized]
     token = "".join(filtered).strip("_")
     return token.replace("__", "_")
+
+
+# Flavoured spirit helpers
+FLAVOUR_KEYWORDS: Set[str] = {
+    "raspberry",
+    "strawberry",
+    "berry",
+    "passion",
+    "pineapple",
+    "coconut",
+    "mango",
+    "vanilla",
+    "caramel",
+    "toffee",
+    "apple",
+    "peach",
+    "cherry",
+    "orange",
+}
+
+BASE_SPIRIT_FAMILIES = ["vodka", "gin", "rum", "tequila"]
+
+
+def extract_flavour_keywords(name: str) -> Set[str]:
+    lower = _normalize(name)
+    return {kw for kw in FLAVOUR_KEYWORDS if kw in lower}
+
+
+def extract_spirit_family(name: str) -> str | None:
+    lower = _normalize(name)
+    for fam in BASE_SPIRIT_FAMILIES:
+        if fam in lower:
+            return fam
+    return None
+
+
+def _is_creamy_name(name: str) -> bool:
+    lowered = _normalize(name)
+    creamy_keywords = [
+        "cream",
+        "baileys",
+        "irish cream",
+        "milk",
+        "custard",
+        "egg white",
+        "eggwhite",
+        "egg ",
+    ]
+    return any(keyword in lowered for keyword in creamy_keywords)
+
+
+def _assign_profile_defaults(name: str, category: str) -> tuple[Set[str], Set[str], bool]:
+    """Apply consistent profile/avoid/neutral heuristics for stock items."""
+
+    profiles: Set[str] = set()
+    avoids: Set[str] = set()
+    neutral = False
+
+    # Spirits
+    spirit_rules = {
+        "vodka": (set(["tropical", "citrus_fresh", "berry", "classic_boozy", "candy_fun", "dessert"]), set(), True),
+        "gin": (set(["citrus_fresh", "berry", "candy_fun"]), set(["dessert"]), False),
+        "rum": (set(["tropical", "candy_fun", "dessert"]), set(["citrus_fresh", "classic_boozy"]), False),
+        "tequila": (set(["classic_boozy", "tropical"]), set(["candy_fun", "dessert"]), False),
+    }
+    for key, (prof, avoid, maybe_neutral) in spirit_rules.items():
+        if key in name:
+            profiles.update(prof)
+            avoids.update(avoid)
+            if maybe_neutral and "premium" not in name:
+                neutral = True
+
+    # Juices
+    juice_rules = {
+        "orange juice": (set(["tropical", "citrus_fresh"]), set(["dessert", "candy_fun"])),
+        "pineapple juice": (set(["tropical", "candy_fun"]), set(["classic_boozy"])),
+        "cranberry juice": (set(["berry", "citrus_fresh", "candy_fun"]), set(["dessert"])),
+        "passion fruit juice": (set(["tropical", "dessert"]), set(["classic_boozy"])),
+        "apple juice": (set(["dessert", "classic_boozy"]), set()),
+    }
+    for key, (prof, avoid) in juice_rules.items():
+        if key in name:
+            profiles.update(prof)
+            avoids.update(avoid)
+
+    # Syrups and sweeteners
+    if "vanilla" in name:
+        profiles.update(["dessert", "tropical"])
+        avoids.update(["citrus_fresh", "classic_boozy", "candy_fun"])
+    if "caramel" in name:
+        profiles.update(["dessert", "candy_fun"])
+        avoids.update(["citrus_fresh", "classic_boozy", "tropical"])
+    if any(kw in name for kw in ["raspberry", "strawberry", "berry"]):
+        profiles.update(["berry", "candy_fun"])
+        avoids.update(["classic_boozy"])
+    if "blue" in name:
+        profiles.update(["candy_fun"])
+        avoids.update(["classic_boozy", "dessert"])
+    if "maple" in name:
+        profiles.update(["dessert", "tropical"])
+        avoids.update(["candy_fun"])
+
+    if "amaretto" in name:
+        profiles.update(["dessert", "tropical"])
+        avoids.update(["citrus_fresh", "candy_fun"])
+    if "grenadine" in name:
+        profiles.update(["tropical", "berry", "candy_fun", "classic_boozy"])
+        avoids.update(["dessert"])
+    if "aperol" in name:
+        profiles.update(["classic_boozy", "citrus_fresh"])
+    if "triple sec" in name:
+        profiles.update(["classic_boozy", "tropical"])
+    if "bitters" in name:
+        profiles.update(["classic_boozy", "citrus_fresh"])
+    if "elderflower" in name:
+        profiles.update(["citrus_fresh", "berry"])
+    if "coconut" in name:
+        profiles.update(["tropical", "dessert"])
+    if "coffee" in name:
+        profiles.update(["dessert", "classic_boozy"])
+        avoids.update(["citrus_fresh"])
+
+    if "lemonade" in name:
+        profiles.update(["tropical", "berry", "candy_fun", "citrus_fresh", "classic_boozy"])
+        avoids.update(["dessert"])
+
+    if not profiles and category == "syrup":
+        profiles.update(["tropical", "citrus_fresh", "berry", "classic_boozy"])
+    if not profiles and category == "juice":
+        profiles.update(["tropical", "citrus_fresh"])
+    if not profiles:
+        profiles.update(["tropical", "citrus_fresh"])
+
+    return profiles, avoids, neutral
 
 
 def _is_flavoured_spirit(ingredient: Ingredient) -> bool:
