@@ -67,6 +67,16 @@ def test_generate_returns_structured_payload(monkeypatch, client):
     ]
 
 
+def test_mixer_formatting_is_top_with():
+    dummy_recipe = _build_dummy_recipe()
+    dummy_recipe.ingredients.append(DummySuggestion("Lemonade", "mixer", 120.0))
+
+    items = service._format_ingredient_list(dummy_recipe)
+
+    assert any(item.lower().startswith("top with lemonade") for item in items)
+    assert not any("ml lemonade" in item.lower() for item in items)
+
+
 def test_generate_uses_session_identifiers(monkeypatch, client):
     dummy_recipe = _build_dummy_recipe()
     captured = {}

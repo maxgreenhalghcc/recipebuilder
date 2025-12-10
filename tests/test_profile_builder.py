@@ -46,6 +46,26 @@ def test_profile_builder_respects_profile_and_limits_juices():
     assert mixer.amount_ml > 0
 
 
+def test_sweet_profiles_keep_sour_in_range():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "base_spirit": "vodka",
+        "house_type": "modern house",
+        "sweetener_question": "rich",
+        "carbonation_texture": "still",
+    }
+
+    recipe = builder.build_recipe(responses, profile="dessert", seed=15)
+
+    sour = next((s for s in recipe.ingredients if s.role == "sour"), None)
+    assert sour is not None
+    assert 15.0 <= sour.amount_ml <= 25.0
+
+
 def test_choose_profile_mapping_cases():
     assert choose_profile({"profile": "berry"}) == "berry"
 

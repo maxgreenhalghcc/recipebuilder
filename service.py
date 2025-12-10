@@ -71,6 +71,9 @@ def _format_ingredient_list(recipe) -> list[str]:
     for suggestion in recipe.ingredients:
         name = suggestion.ingredient.name
         role = suggestion.role if suggestion.role != "base" else ""
+        if suggestion.role == "mixer":
+            items.append(f"Top with {name} (mixer)")
+            continue
         if suggestion.amount_ml and suggestion.amount_ml > 0:
             amount_text = f"{suggestion.amount_ml:.0f}ml"
         else:

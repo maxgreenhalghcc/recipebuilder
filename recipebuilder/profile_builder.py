@@ -210,6 +210,25 @@ def is_creamy(item: StockItem) -> bool:
     return any(keyword in name for keyword in creamy_keywords)
 
 
+def _is_sour(item: StockItem) -> bool:
+    name = item.name.lower()
+    return item.role == "sour" or "lemon" in name or "lime" in name or "sour" in name
+
+
+def _is_mixer(item: StockItem) -> bool:
+    name = item.name.lower()
+    return item.role == "mixer" or "lemonade" in name or "soda" in name or "tonic" in name or "mixer" in name
+
+
+def _is_core_juice(item: StockItem) -> bool:
+    if item.role != "juice":
+        return False
+    name = item.name.lower()
+    if _is_sour(item) or _is_mixer(item):
+        return False
+    return "juice" in name or item.category == "juice"
+
+
 class ProfileRecipeBuilder:
     """Build cocktails using profile-guarded stock items."""
 
@@ -251,7 +270,9 @@ class ProfileRecipeBuilder:
 
         base_family = extract_spirit_family(base.name) or ""
 
-        juices = self._choose_juices(profile_items("juice"), prefs["juice_keywords"], limit=2)
+        juice_pool = profile_items("juice")
+        core_juices = [i for i in juice_pool if _is_core_juice(i)]
+        juices = self._choose_juices(core_juices, prefs["juice_keywords"], limit=2)
         sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
             profile,
             base_family,
@@ -261,7 +282,8 @@ class ProfileRecipeBuilder:
             rnd,
         )
         modifier = self._choose_modifier(profile_items("modifier"), prefs["modifier_keywords"])
-        sour = self._maybe_add_sour(profile, profile_items("sour"), prefs["needs_sour"])
+        available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
+        sour = self._maybe_add_sour(profile, available_sours, prefs["needs_sour"])
 
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
@@ -283,6 +305,29 @@ class ProfileRecipeBuilder:
                 base_ml = max(25.0, 40.0 - flavoured_ml)
 
         juice_amounts = self._assign_juice_amounts(juices, carbonation, prefs["juice_ml"])
+
+        sweetness_load = self._estimate_sweetness_load(
+            sweetener,
+            sweet_ml,
+            flavoured_spirit,
+            flavoured_ml,
+            modifier,
+            modifier_ml,
+            juices,
+            juice_amounts,
+        )
+        if sweetness_load >= 25.0:
+            if sour is None and available_sours:
+                sour = available_sours[0]
+                sour_ml = prefs["sour_ml"] if prefs.get("needs_sour", True) else 15.0
+            if sour:
+                sour_ml = max(15.0, min(max(sour_ml, 15.0), 25.0))
+        elif sour:
+            sour_ml = max(10.0, sour_ml)
+
+        juice_amounts, sour_ml = self._rebalance_juices_and_sour(
+            juices, juice_amounts, sour_ml, glass, prefs["juice_ml"]
+        )
 
         spirit_extra = flavoured_ml if flavoured_spirit and flavoured_spirit.category == "spirit" else 0.0
         core_volume = base_ml + modifier_ml + sweet_ml + sour_ml + sum(juice_amounts) + spirit_extra
@@ -466,7 +511,18 @@ class ProfileRecipeBuilder:
         flavoured_pick: Optional[StockItem] = None
         flavoured_ml = 0.0
 
-        if matching_syrups:
+        if profile == "tropical":
+            grenadine_first = [
+                s
+                for s in matching_syrups + neutral_syrups
+                if s.category == "syrup"
+                and ("grenadine" in s.name.lower() or "tropical" in (kw.lower() for kw in s.profiles))
+            ]
+            if grenadine_first:
+                sweetener_pick = grenadine_first[0]
+                sweet_ml = rnd.uniform(12, 18)
+                matching_syrups = [s for s in matching_syrups if s != sweetener_pick]
+        if sweetener_pick is None and matching_syrups:
             sweetener_pick = matching_syrups[0]
             sweet_ml = rnd.uniform(12, 18)
             if flavoured_spirits and abv_lane != "low":
@@ -491,6 +547,34 @@ class ProfileRecipeBuilder:
             return None
         return _pick_first_matching(modifiers, keywords) or modifiers[0]
 
+    def _estimate_sweetness_load(
+        self,
+        sweetener: Optional[StockItem],
+        sweet_ml: float,
+        flavoured_spirit: Optional[StockItem],
+        flavoured_ml: float,
+        modifier: Optional[StockItem],
+        modifier_ml: float,
+        juices: Sequence[StockItem],
+        juice_amounts: Sequence[float],
+    ) -> float:
+        load = 0.0
+
+        def sweetish(item: StockItem) -> bool:
+            name = item.name.lower()
+            return any(token in name for token in ["sweet", "vanilla", "caramel", "passion", "pineapple", "grenadine", "rasp", "straw", "berry", "blue", "maple", "honey"])
+
+        if sweetener:
+            load += sweet_ml
+        if flavoured_spirit and sweetish(flavoured_spirit):
+            load += flavoured_ml
+        if modifier and sweetish(modifier):
+            load += modifier_ml
+        for juice, amt in zip(juices, juice_amounts):
+            if sweetish(juice):
+                load += amt * 0.5
+        return load
+
     def _maybe_add_sour(self, profile: str, sours: Sequence[StockItem], needs_sour: bool) -> Optional[StockItem]:
         if not needs_sour:
             return None
@@ -507,6 +591,39 @@ class ProfileRecipeBuilder:
                 amt = max(base, amt - 5)
             amounts.append(max(base, amt))
         return amounts
+
+    def _rebalance_juices_and_sour(
+        self,
+        juices: Sequence[StockItem],
+        juice_amounts: Sequence[float],
+        sour_ml: float,
+        glass: Glass,
+        ml_range: tuple[float, float],
+    ) -> tuple[List[float], float]:
+        if not glass.sparkling or not juices:
+            return list(juice_amounts), sour_ml
+
+        target_low, target_high = 70.0, 100.0
+        juice_list = list(juice_amounts)
+        pre_mixer = sum(juice_list) + sour_ml
+        base_min, base_max = ml_range
+
+        if pre_mixer == 0:
+            return juice_list, sour_ml
+
+        def clamp(amount: float, minimum: float, maximum: float) -> float:
+            return max(minimum, min(maximum, amount))
+
+        if pre_mixer < target_low:
+            scale = target_low / pre_mixer
+            juice_list = [clamp(amt * scale, base_min, max(base_max, base_min)) for amt in juice_list]
+            sour_ml = clamp(sour_ml * scale, 10.0, 25.0)
+        elif pre_mixer > target_high:
+            scale = target_high / pre_mixer
+            juice_list = [clamp(amt * scale, base_min, base_max) for amt in juice_list]
+            sour_ml = clamp(sour_ml * scale, 10.0, 25.0)
+
+        return juice_list, sour_ml
 
     def _select_mixer(self, mixers: Sequence[StockItem], keywords: Sequence[str], carbonation: str) -> Optional[StockItem]:
         if not mixers and not carbonation.startswith("properly"):
