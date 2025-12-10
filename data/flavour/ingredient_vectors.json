@@ -1,0 +1,418 @@
+[
+  {
+    "name": "Vodka",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.2, "bitter": 0.05},
+    "aroma": {"citrus": 0.3, "floral": 0.1},
+    "structure": {"strength_abv": 12.0, "body": 0.2},
+    "pairing_prior": {"with": {"refreshing": 0.8, "elegant": 0.4}},
+    "compounds": ["ethanol", "vanillin"]
+  },
+  {
+    "name": "Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"bitter": 0.15, "sweet": 0.1},
+    "aroma": {"herbal": 0.4, "citrus": 0.3, "floral": 0.2},
+    "structure": {"strength_abv": 12.0, "body": 0.3},
+    "pairing_prior": {"with": {"refreshing": 0.7, "elegant": 0.6}},
+    "compounds": ["juniper", "linalool", "limonene"]
+  },
+  {
+    "name": "Normal Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"bitter": 0.15, "sweet": 0.1},
+    "aroma": {"herbal": 0.4, "citrus": 0.25, "floral": 0.2},
+    "structure": {"strength_abv": 11.5, "body": 0.25},
+    "pairing_prior": {"with": {"refreshing": 0.75, "elegant": 0.55}},
+    "compounds": ["juniper", "coriander"]
+  },
+  {
+    "name": "Pink Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.25, "bitter": 0.08},
+    "aroma": {"berry": 0.4, "floral": 0.2, "citrus": 0.2},
+    "structure": {"strength_abv": 11.0, "body": 0.3},
+    "pairing_prior": {"with": {"refreshing": 0.6, "elegant": 0.5}},
+    "compounds": ["juniper", "raspberry ketone"]
+  },
+  {
+    "name": "Passionfruit Vodka",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.35, "sour": 0.1},
+    "aroma": {"tropical": 0.6, "floral": 0.15},
+    "structure": {"strength_abv": 11.0, "body": 0.25},
+    "pairing_prior": {"with": {"refreshing": 0.7, "indulgent": 0.4}},
+    "compounds": ["passionfruit ester", "ethyl butyrate"]
+  },
+  {
+    "name": "Berry Vodka",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.3, "sour": 0.1},
+    "aroma": {"berry": 0.6, "floral": 0.2},
+    "structure": {"strength_abv": 11.0, "body": 0.25},
+    "pairing_prior": {"with": {"refreshing": 0.65, "elegant": 0.45}},
+    "compounds": ["benzaldehyde", "anthocyanin"]
+  },
+  {
+    "name": "Rum",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.4, "bitter": 0.05},
+    "aroma": {"tropical": 0.4, "vanilla": 0.3, "caramel": 0.2},
+    "structure": {"strength_abv": 12.0, "body": 0.45},
+    "pairing_prior": {"with": {"indulgent": 0.6, "refreshing": 0.5}},
+    "compounds": ["ethyl butyrate", "vanillin"]
+  },
+  {
+    "name": "Bacardi",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.35, "sour": 0.05},
+    "aroma": {"tropical": 0.4, "citrus": 0.2},
+    "structure": {"strength_abv": 11.5, "body": 0.35},
+    "pairing_prior": {"with": {"refreshing": 0.7, "tropical": 0.6}},
+    "compounds": ["ethyl acetate", "butyric acid"]
+  },
+  {
+    "name": "Berry Bacardi",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.35, "sour": 0.1},
+    "aroma": {"berry": 0.55, "tropical": 0.25},
+    "structure": {"strength_abv": 11.0, "body": 0.35},
+    "pairing_prior": {"with": {"refreshing": 0.65, "tropical": 0.5}},
+    "compounds": ["raspberry ketone", "ethyl butyrate"]
+  },
+  {
+    "name": "Tropical Rum",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.4, "sour": 0.1},
+    "aroma": {"tropical": 0.6, "citrus": 0.2},
+    "structure": {"strength_abv": 11.5, "body": 0.4},
+    "pairing_prior": {"with": {"refreshing": 0.6, "indulgent": 0.4}},
+    "compounds": ["ethyl butyrate", "limonene"]
+  },
+  {
+    "name": "Dark Rum",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.45, "bitter": 0.1},
+    "aroma": {"woody": 0.4, "spice": 0.3, "caramel": 0.25},
+    "structure": {"strength_abv": 12.0, "body": 0.55},
+    "pairing_prior": {"with": {"indulgent": 0.7, "bold": 0.5}},
+    "compounds": ["vanillin", "oak lactone"]
+  },
+  {
+    "name": "Spiced Rum",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.4, "bitter": 0.1},
+    "aroma": {"spice": 0.5, "woody": 0.3, "vanilla": 0.2},
+    "structure": {"strength_abv": 11.5, "body": 0.5},
+    "pairing_prior": {"with": {"indulgent": 0.6, "bold": 0.5}},
+    "compounds": ["cinnamon aldehyde", "vanillin"]
+  },
+  {
+    "name": "Malibu",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.5},
+    "aroma": {"tropical": 0.6, "nutty": 0.2, "vanilla": 0.2},
+    "structure": {"strength_abv": 6.0, "body": 0.4},
+    "flags": ["coconut"],
+    "pairing_prior": {"with": {"refreshing": 0.55, "indulgent": 0.45}},
+    "compounds": ["coconut lactone", "vanillin"]
+  },
+  {
+    "name": "Passoa",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.45, "sour": 0.15},
+    "aroma": {"tropical": 0.65, "floral": 0.2},
+    "structure": {"strength_abv": 6.5, "body": 0.35},
+    "pairing_prior": {"with": {"refreshing": 0.6, "indulgent": 0.4}},
+    "compounds": ["passionfruit ester", "ethyl butyrate"]
+  },
+  {
+    "name": "Peach Schnapps",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.5, "sour": 0.1},
+    "aroma": {"stone-fruit": 0.7, "floral": 0.2},
+    "structure": {"strength_abv": 6.0, "body": 0.3},
+    "pairing_prior": {"with": {"refreshing": 0.55, "indulgent": 0.45}},
+    "compounds": ["benzaldehyde", "gamma-decalactone"]
+  },
+  {
+    "name": "Amaretto",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.55, "bitter": 0.1},
+    "aroma": {"nutty": 0.5, "vanilla": 0.3, "caramel": 0.2},
+    "structure": {"strength_abv": 7.0, "body": 0.45},
+    "flags": ["nut"],
+    "pairing_prior": {"with": {"indulgent": 0.7, "bold": 0.4}},
+    "compounds": ["benzaldehyde", "coumarin"]
+  },
+  {
+    "name": "White Rum",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.35},
+    "aroma": {"tropical": 0.4, "citrus": 0.2},
+    "structure": {"strength_abv": 11.5, "body": 0.35},
+    "pairing_prior": {"with": {"refreshing": 0.7, "tropical": 0.5}},
+    "compounds": ["ethyl butyrate", "ethyl acetate"]
+  },
+  {
+    "name": "Tequila",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.25, "bitter": 0.1},
+    "aroma": {"citrus": 0.3, "herbal": 0.25, "woody": 0.2},
+    "structure": {"strength_abv": 12.0, "body": 0.4},
+    "pairing_prior": {"with": {"bold": 0.6, "refreshing": 0.5}},
+    "compounds": ["agavins", "limonene"]
+  },
+  {
+    "name": "Bourbon",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.35, "bitter": 0.15},
+    "aroma": {"woody": 0.4, "vanilla": 0.25, "caramel": 0.25},
+    "structure": {"strength_abv": 12.0, "body": 0.5},
+    "pairing_prior": {"with": {"indulgent": 0.7, "bold": 0.5}},
+    "compounds": ["oak lactone", "vanillin"]
+  },
+  {
+    "name": "Rhubarb Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.3, "sour": 0.15},
+    "aroma": {"floral": 0.3, "stone-fruit": 0.3, "citrus": 0.2},
+    "structure": {"strength_abv": 10.5, "body": 0.3},
+    "pairing_prior": {"with": {"refreshing": 0.6, "elegant": 0.5}},
+    "compounds": ["anthocyanin", "limonene"]
+  },
+  {
+    "name": "Orange Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.28, "bitter": 0.1},
+    "aroma": {"citrus": 0.6, "floral": 0.2},
+    "structure": {"strength_abv": 11.0, "body": 0.3},
+    "pairing_prior": {"with": {"refreshing": 0.65, "elegant": 0.45}},
+    "compounds": ["limonene", "neroli"]
+  },
+  {
+    "name": "Lemon Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"sour": 0.25, "sweet": 0.2},
+    "aroma": {"citrus": 0.6, "herbal": 0.2},
+    "structure": {"strength_abv": 11.0, "body": 0.28},
+    "pairing_prior": {"with": {"refreshing": 0.7, "elegant": 0.4}},
+    "compounds": ["citral", "limonene"]
+  },
+  {
+    "name": "Passion Fruit Gin",
+    "category": "spirit",
+    "taste_per_30ml": {"sweet": 0.35, "sour": 0.15},
+    "aroma": {"tropical": 0.6, "floral": 0.2},
+    "structure": {"strength_abv": 11.0, "body": 0.32},
+    "pairing_prior": {"with": {"refreshing": 0.6, "indulgent": 0.4}},
+    "compounds": ["ethyl butyrate", "passionfruit ester"]
+  },
+  {
+    "name": "Maple Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.8, "umami": 0.05},
+    "aroma": {"caramel": 0.4, "woody": 0.2, "vanilla": 0.2},
+    "structure": {"body": 0.6},
+    "pairing_prior": {"with": {"indulgent": 0.7, "bold": 0.4}},
+    "compounds": ["maple lactone", "vanillin"]
+  },
+  {
+    "name": "Vanilla Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.8},
+    "aroma": {"vanilla": 0.6, "caramel": 0.2},
+    "structure": {"body": 0.5},
+    "pairing_prior": {"with": {"indulgent": 0.65, "elegant": 0.45}},
+    "compounds": ["vanillin", "coumarin"]
+  },
+  {
+    "name": "Simple Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.75},
+    "aroma": {},
+    "structure": {"body": 0.3},
+    "pairing_prior": {"with": {"refreshing": 0.5}},
+    "compounds": ["sucrose"]
+  },
+  {
+    "name": "Caramel Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.85},
+    "aroma": {"caramel": 0.5, "vanilla": 0.2},
+    "structure": {"body": 0.55},
+    "pairing_prior": {"with": {"indulgent": 0.7}},
+    "compounds": ["caramelan"]
+  },
+  {
+    "name": "Blue Raspberry Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.85, "sour": 0.1},
+    "aroma": {"berry": 0.6, "citrus": 0.2},
+    "structure": {"body": 0.4},
+    "pairing_prior": {"with": {"refreshing": 0.6, "bold": 0.3}},
+    "compounds": ["maltol", "citric acid"]
+  },
+  {
+    "name": "Peach Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.8},
+    "aroma": {"stone-fruit": 0.6, "floral": 0.2},
+    "structure": {"body": 0.4},
+    "pairing_prior": {"with": {"refreshing": 0.55, "indulgent": 0.35}},
+    "compounds": ["gamma-decalactone"]
+  },
+  {
+    "name": "Elderflower Syrup",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.75},
+    "aroma": {"floral": 0.6, "citrus": 0.2},
+    "structure": {"body": 0.35},
+    "pairing_prior": {"with": {"refreshing": 0.6, "elegant": 0.5}},
+    "compounds": ["linalool", "nerol"]
+  },
+  {
+    "name": "Grenadine",
+    "category": "syrup",
+    "taste_per_30ml": {"sweet": 0.8, "sour": 0.15},
+    "aroma": {"berry": 0.5, "tropical": 0.2},
+    "structure": {"body": 0.4},
+    "pairing_prior": {"with": {"refreshing": 0.55, "bold": 0.35}},
+    "compounds": ["pomegranate tannin", "citric acid"]
+  },
+  {
+    "name": "Orange Juice",
+    "category": "juice",
+    "taste_per_30ml": {"sweet": 0.35, "sour": 0.25},
+    "aroma": {"citrus": 0.7, "floral": 0.1},
+    "structure": {"body": 0.15, "sparkle": 0.0},
+    "pairing_prior": {"with": {"refreshing": 0.8}},
+    "compounds": ["limonene", "citral"]
+  },
+  {
+    "name": "Pineapple Juice",
+    "category": "juice",
+    "taste_per_30ml": {"sweet": 0.45, "sour": 0.2},
+    "aroma": {"tropical": 0.7, "citrus": 0.1},
+    "structure": {"body": 0.2},
+    "pairing_prior": {"with": {"refreshing": 0.7, "indulgent": 0.3}},
+    "compounds": ["methyl butyrate", "ethyl acetate"]
+  },
+  {
+    "name": "Cranberry Juice",
+    "category": "juice",
+    "taste_per_30ml": {"sweet": 0.25, "sour": 0.35, "bitter": 0.1},
+    "aroma": {"berry": 0.5, "woody": 0.1},
+    "structure": {"body": 0.1},
+    "pairing_prior": {"with": {"refreshing": 0.65, "bold": 0.3}},
+    "compounds": ["benzoic acid", "anthocyanin"]
+  },
+  {
+    "name": "Passion Fruit Juice",
+    "category": "juice",
+    "taste_per_30ml": {"sweet": 0.4, "sour": 0.3},
+    "aroma": {"tropical": 0.75, "floral": 0.15},
+    "structure": {"body": 0.18},
+    "pairing_prior": {"with": {"refreshing": 0.7, "indulgent": 0.35}},
+    "compounds": ["passionfruit ester", "ethyl butyrate"]
+  },
+  {
+    "name": "Lime Juice",
+    "category": "modifier",
+    "taste_per_30ml": {"sour": 0.9, "sweet": 0.05, "bitter": 0.05},
+    "aroma": {"citrus": 0.8, "floral": 0.1, "herbal": 0.1},
+    "structure": {"body": -0.1},
+    "pairing_prior": {"with": {"refreshing": 0.9}},
+    "compounds": ["citric acid", "limonene"]
+  },
+  {
+    "name": "Bitters",
+    "category": "modifier",
+    "taste_per_30ml": {"bitter": 0.9, "spice": 0.2},
+    "aroma": {"spice": 0.6, "herbal": 0.3, "woody": 0.2},
+    "structure": {"strength_abv": 5.0, "body": 0.2},
+    "pairing_prior": {"with": {"bold": 0.6, "elegant": 0.3}},
+    "compounds": ["gentian", "cinnamon"]
+  },
+  {
+    "name": "Lavender Sprig",
+    "category": "garnish",
+    "taste_per_30ml": {},
+    "aroma": {"floral": 0.8, "herbal": 0.2},
+    "structure": {},
+    "pairing_prior": {"with": {"elegant": 0.6}},
+    "compounds": ["linalool", "linalyl acetate"]
+  },
+  {
+    "name": "Lemon Twist",
+    "category": "garnish",
+    "taste_per_30ml": {},
+    "aroma": {"citrus": 0.9},
+    "structure": {},
+    "pairing_prior": {"with": {"refreshing": 0.7}},
+    "compounds": ["limonene"]
+  },
+  {
+    "name": "Rosemary Sprig",
+    "category": "garnish",
+    "taste_per_30ml": {},
+    "aroma": {"herbal": 0.7, "woody": 0.2, "spice": 0.1},
+    "structure": {},
+    "pairing_prior": {"with": {"bold": 0.4, "elegant": 0.3}},
+    "compounds": ["cineole", "pinene"]
+  },
+  {
+    "name": "Maraschino Cherry",
+    "category": "garnish",
+    "taste_per_30ml": {"sweet": 0.3},
+    "aroma": {"berry": 0.4, "vanilla": 0.2},
+    "structure": {},
+    "pairing_prior": {"with": {"indulgent": 0.5}},
+    "compounds": ["benzaldehyde"]
+  },
+  {
+    "name": "Mint",
+    "category": "garnish",
+    "taste_per_30ml": {},
+    "aroma": {"herbal": 0.6, "floral": 0.2},
+    "structure": {"temperature": -0.2},
+    "pairing_prior": {"with": {"refreshing": 0.8}},
+    "compounds": ["menthol", "menthone"]
+  },
+  {
+    "name": "Passion Fruit",
+    "category": "garnish",
+    "taste_per_30ml": {"sweet": 0.2, "sour": 0.15},
+    "aroma": {"tropical": 0.7},
+    "structure": {},
+    "pairing_prior": {"with": {"refreshing": 0.6, "indulgent": 0.3}},
+    "compounds": ["ethyl butyrate"]
+  },
+  {
+    "name": "Pineapple",
+    "category": "garnish",
+    "taste_per_30ml": {"sweet": 0.25},
+    "aroma": {"tropical": 0.7},
+    "structure": {},
+    "pairing_prior": {"with": {"tropical": 0.7}},
+    "compounds": ["methyl butyrate"]
+  },
+  {
+    "name": "Orange",
+    "category": "garnish",
+    "taste_per_30ml": {"sweet": 0.2, "sour": 0.1},
+    "aroma": {"citrus": 0.8},
+    "structure": {},
+    "pairing_prior": {"with": {"refreshing": 0.7}},
+    "compounds": ["limonene"]
+  },
+  {
+    "name": "Raspberries",
+    "category": "garnish",
+    "taste_per_30ml": {"sweet": 0.3, "sour": 0.15},
+    "aroma": {"berry": 0.7},
+    "structure": {},
+    "pairing_prior": {"with": {"refreshing": 0.6, "elegant": 0.4}},
+    "compounds": ["raspberry ketone"]
+  }
+]

@@ -1,0 +1,856 @@
+{
+  "samples": [
+    {
+      "name": "Sex on the Beach",
+      "success_score": 4.5,
+      "tags": ["fruit", "sweet", "citrus"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Orange slice / cherry",
+        "steps": [
+          "Fill glass with ice.",
+          "Pour vodka and peach schnapps over ice.",
+          "Add orange juice and cranberry juice.",
+          "Stir gently.",
+          "Garnish with orange slice or cherry."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 40, "flavour_tags": ["vodka", "neutral", "clean"]},
+        {"name": "Peach Schnapps", "role": "modifier", "amount_ml": 20, "flavour_tags": ["peach", "stone fruit", "sweet"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 40, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Cranberry Juice", "role": "juice", "amount_ml": 40, "flavour_tags": ["cranberry", "berry", "tart"]}
+      ]
+    },
+    {
+      "name": "Mojito",
+      "success_score": 4.6,
+      "tags": ["herbal", "citrus", "refreshing"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Mint sprig & lime wedge",
+        "steps": [
+          "Muddle mint leaves gently with sugar syrup and lime juice in the base of the glass.",
+          "Fill glass with ice.",
+          "Add rum.",
+          "Top up with soda water.",
+          "Stir gently to bring flavors together.",
+          "Garnish with mint sprig and lime wedge."
+        ],
+        "ice": "crushed"
+      },
+      "ingredients": [
+        {"name": "White Rum", "role": "base", "amount_ml": 45, "flavour_tags": ["rum", "light", "tropical"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Sugar Syrup (1:1)", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["sugar", "sweet", "simple"]},
+        {"name": "Soda Water", "role": "top_up", "amount_ml": 60, "flavour_tags": ["soda", "sparkling", "neutral"]},
+        {"name": "Mint Leaves (muddled)", "role": "modifier", "amount_ml": 0, "flavour_tags": ["mint", "herbal", "fresh"]}
+      ]
+    },
+    {
+      "name": "Bloody Mary",
+      "success_score": 4.4,
+      "tags": ["savory", "spicy", "vegetable"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Celery stalk & lemon wedge",
+        "steps": [
+          "Add vodka, tomato juice, and lemon juice into a mixing glass with ice.",
+          "Add Worcestershire and Tabasco.",
+          "Stir gently to combine (don’t shake).",
+          "Strain into a highball glass with fresh ice.",
+          "Garnish with celery and lemon wedge."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 45, "flavour_tags": ["vodka", "clean", "neutral"]},
+        {"name": "Tomato Juice", "role": "juice", "amount_ml": 90, "flavour_tags": ["tomato", "savory", "umami"]},
+        {"name": "Fresh Lemon Juice", "role": "juice", "amount_ml": 15, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Worcestershire Sauce", "role": "modifier", "amount_ml": 2, "flavour_tags": ["savory", "umami", "spice"]},
+        {"name": "Tabasco", "role": "modifier", "amount_ml": 1, "flavour_tags": ["spicy", "chili", "heat"]}
+      ]
+    },
+    {
+      "name": "Paradise",
+      "success_score": 4.5,
+      "tags": ["citrus", "fruit", "aperitif"],
+      "metadata": {
+        "glassware": "cocktail",
+        "garnish": "Orange twist",
+        "steps": [
+          "Add gin, apricot brandy, and orange juice to a shaker with ice.",
+          "Shake and strain into a chilled cocktail glass.",
+          "Garnish with an orange twist."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 35, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Apricot Brandy", "role": "modifier", "amount_ml": 20, "flavour_tags": ["apricot", "stone fruit", "sweet"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 15, "flavour_tags": ["orange", "citrus", "zesty"]}
+      ]
+    },
+    {
+      "name": "Bramble",
+      "success_score": 4.6,
+      "tags": ["berry", "fresh", "citrus"],
+      "metadata": {
+        "glassware": "old fashioned",
+        "garnish": "Blackberries & lemon slice",
+        "steps": [
+          "Add gin, lemon juice, and sugar syrup into a shaker with ice.",
+          "Shake and strain over crushed ice into old fashioned glass.",
+          "Drizzle crème de mûre over the top (let it trickle through).",
+          "Garnish with blackberries and lemon slice."
+        ],
+        "ice": "crushed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Fresh Lemon Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Sugar Syrup (1:1)", "role": "sweetener", "amount_ml": 12.5, "flavour_tags": ["sugar", "sweet", "simple"]},
+        {"name": "Crème de Mûre", "role": "modifier", "amount_ml": 15, "flavour_tags": ["blackberry", "berry", "sweet"]}
+      ]
+    },
+    {
+      "name": "John Collins",
+      "success_score": 4.4,
+      "tags": ["citrus", "classic", "light"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Lemon slice & cherry",
+        "steps": [
+          "Add gin, lemon juice, and sugar syrup to a shaker with ice.",
+          "Shake briefly and strain into a highball glass over ice.",
+          "Top with soda water.",
+          "Stir gently.",
+          "Garnish with lemon slice and cherry."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 45, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Fresh Lemon Juice", "role": "juice", "amount_ml": 30, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Sugar Syrup (1:1)", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["sugar", "sweet", "simple"]},
+        {"name": "Soda Water", "role": "top_up", "amount_ml": 60, "flavour_tags": ["soda", "sparkling", "neutral"]}
+      ]
+    },
+    {
+      "name": "Tom Collins",
+      "success_score": 4.4,
+      "tags": ["citrus", "refreshing", "classic"],
+      "metadata": {
+        "glassware": "collins",
+        "garnish": "Lemon wheel & cherry",
+        "steps": [
+          "Fill a Collins glass with ice.",
+          "Add gin, lemon juice, and sugar syrup.",
+          "Stir gently to combine.",
+          "Top up with soda water.",
+          "Garnish with lemon wheel and cherry."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Fresh Lemon Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Sugar Syrup (1:1)", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["sugar", "sweet", "simple"]},
+        {"name": "Soda Water", "role": "top_up", "amount_ml": 60, "flavour_tags": ["soda", "sparkling", "neutral"]}
+      ]
+    },
+    {
+      "name": "Margarita",
+      "success_score": 4.6,
+      "tags": ["citrus", "tart", "classic"],
+      "metadata": {
+        "glassware": "cocktail / coupe",
+        "garnish": "Lime wheel / salted rim",
+        "steps": [
+          "Add tequila, triple sec, and lime juice into a shaker with ice.",
+          "Shake well.",
+          "Strain into a chilled cocktail or coupe glass (rim salted optionally).",
+          "Garnish with lime wheel."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Tequila (100% agave)", "role": "base", "amount_ml": 50, "flavour_tags": ["tequila", "agave", "earthy"]},
+        {"name": "Triple Sec", "role": "modifier", "amount_ml": 20, "flavour_tags": ["orange", "citrus", "sweet"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 15, "flavour_tags": ["lime", "citrus", "zesty"]}
+      ]
+    },
+    {
+      "name": "Piña Colada",
+      "success_score": 4.7,
+      "tags": ["tropical", "sweet", "creamy"],
+      "metadata": {
+        "glassware": "tiki / hurricane",
+        "garnish": "Pineapple wedge & cherry",
+        "steps": [
+          "Add rum, coconut cream, and pineapple juice into a blender with ice (or shaker if preferred).",
+          "Blend (or shake) until smooth.",
+          "Pour into tiki or hurricane glass.",
+          "Garnish with pineapple wedge and cherry."
+        ],
+        "ice": "blended"
+      },
+      "ingredients": [
+        {"name": "White Rum", "role": "base", "amount_ml": 50, "flavour_tags": ["rum", "light", "tropical"]},
+        {"name": "Coconut Cream", "role": "modifier", "amount_ml": 30, "flavour_tags": ["coconut", "creamy", "sweet"]},
+        {"name": "Fresh Pineapple Juice", "role": "juice", "amount_ml": 50, "flavour_tags": ["pineapple", "tropical", "vibrant"]}
+      ]
+    },
+    {
+      "name": "Mimosa",
+      "success_score": 4.3,
+      "tags": ["citrus", "brunch", "light"],
+      "metadata": {
+        "glassware": "champagne flute",
+        "garnish": "Orange twist (optional)",
+        "steps": [
+          "Pour orange juice into flute.",
+          "Gently top up with sparkling wine.",
+          "Stir gently if needed.",
+          "Garnish with twist of orange."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 75, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Prosecco / Champagne", "role": "modifier", "amount_ml": 75, "flavour_tags": ["sparkling", "grape", "dry"]}
+      ]
+    },
+    {
+      "name": "Zombie",
+      "success_score": 4.7,
+      "tags": ["tropical", "fruit", "strong", "spice"],
+      "metadata": {
+        "glassware": "tall / tiki",
+        "garnish": "Mint sprig",
+        "steps": [
+          "Add all ingredients to blender or shaker with crushed / cracked ice.",
+          "Blend briefly or shake and pour over crushed ice in tiki glass.",
+          "Garnish with mint sprig."
+        ],
+        "ice": "crushed"
+      },
+      "ingredients": [
+        {"name": "Dark Rum", "role": "base", "amount_ml": 45, "flavour_tags": ["rum", "dark", "molasses"]},
+        {"name": "Gold Rum", "role": "base", "amount_ml": 45, "flavour_tags": ["rum", "gold", "caramel"]},
+        {"name": "Demerara Rum", "role": "base", "amount_ml": 30, "flavour_tags": ["rum", "demerara", "rich"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Falernum", "role": "modifier", "amount_ml": 15, "flavour_tags": ["spice", "clove", "sweet"]},
+        {"name": "Don's Mix", "role": "modifier", "amount_ml": 15, "flavour_tags": ["grapefruit", "cinnamon", "spiced"]},
+        {"name": "Grenadine", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["pomegranate", "sweet", "red"]},
+        {"name": "Angostura Bitters", "role": "modifier", "amount_ml": 2, "flavour_tags": ["bitters", "spice", "aromatic"]},
+        {"name": "Pernod", "role": "modifier", "amount_ml": 3, "flavour_tags": ["anise", "herbal", "intense"]}
+      ]
+    },
+    {
+      "name": "French Martini",
+      "success_score": 4.5,
+      "tags": ["fruit", "sweet", "tropical"],
+      "metadata": {
+        "glassware": "cocktail",
+        "garnish": "Raspberry or twist",
+        "steps": [
+          "Add vodka, raspberry liqueur, and pineapple juice to shaker with ice.",
+          "Shake well and strain into chilled cocktail glass.",
+          "Garnish with raspberry or twist."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 45, "flavour_tags": ["vodka", "clean", "neutral"]},
+        {"name": "Raspberry Liqueur", "role": "modifier", "amount_ml": 15, "flavour_tags": ["raspberry", "berry", "sweet"]},
+        {"name": "Fresh Pineapple Juice", "role": "juice", "amount_ml": 30, "flavour_tags": ["pineapple", "tropical", "vibrant"]}
+      ]
+    },
+    {
+      "name": "Campari Orange (Garibaldi)",
+      "success_score": 4.2,
+      "tags": ["bitter", "citrus", "aperitif"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Orange slice",
+        "steps": [
+          "Fill the glass with ice.",
+          "Pour Campari over ice.",
+          "Add orange juice.",
+          "Stir gently.",
+          "Garnish with an orange slice."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Campari", "role": "base", "amount_ml": 45, "flavour_tags": ["bitter", "orange", "herbal"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 90, "flavour_tags": ["orange", "citrus", "zesty"]}
+      ]
+    },
+    {
+      "name": "Screwdriver",
+      "success_score": 4.1,
+      "tags": ["citrus", "bright", "easy"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Orange slice",
+        "steps": [
+          "Fill a highball glass with ice.",
+          "Pour vodka and orange juice over ice.",
+          "Stir gently to combine.",
+          "Garnish with orange slice."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 50, "flavour_tags": ["vodka", "clean", "neutral"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 100, "flavour_tags": ["orange", "citrus", "zesty"]}
+      ]
+    },
+    {
+      "name": "Daiquiri",
+      "success_score": 4.6,
+      "tags": ["tart", "classic", "refreshing"],
+      "metadata": {
+        "glassware": "coupe",
+        "garnish": "Lime wheel (optional)",
+        "steps": [
+          "Add rum, lime juice, and syrup to a shaker with ice.",
+          "Shake until well chilled.",
+          "Double strain into a chilled coupe.",
+          "Optionally garnish with a lime wheel."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Light Rum", "role": "base", "amount_ml": 60, "flavour_tags": ["rum", "light", "tropical"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Sugar Syrup (1:1)", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["sugar", "sweet", "simple"]}
+      ]
+    },
+    {
+      "name": "Blueberry & Blackberry Gin & Juice",
+      "success_score": 4.3,
+      "tags": ["berry", "herbal", "refreshing"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Herb sprig or berry skewer",
+        "steps": [
+          "Fill a highball with ice.",
+          "Add gin, dry vermouth, and lime juice.",
+          "Top with berry juice and stir gently.",
+          "Garnish with herb or berries."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 30, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Dry Vermouth", "role": "modifier", "amount_ml": 20, "flavour_tags": ["vermouth", "herbal", "dry"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Berry Juice", "role": "juice", "amount_ml": 80, "flavour_tags": ["berry", "sweet", "tart"]}
+      ]
+    },
+    {
+      "name": "Apple, Mint & Lime Gin & Juice",
+      "success_score": 4.2,
+      "tags": ["fruit", "fresh", "citrus", "herbal"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Mint sprig",
+        "steps": [
+          "Fill a highball with ice.",
+          "Add gin, dry vermouth, and lime juice.",
+          "Top with apple juice and stir gently.",
+          "Garnish with mint sprig."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 30, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Dry Vermouth", "role": "modifier", "amount_ml": 20, "flavour_tags": ["vermouth", "herbal", "dry"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Apple Juice", "role": "juice", "amount_ml": 80, "flavour_tags": ["apple", "fruit", "fresh"]}
+      ]
+    },
+    {
+      "name": "Buck’s Fizz",
+      "success_score": 4.2,
+      "tags": ["citrus", "brunch", "light"],
+      "metadata": {
+        "glassware": "champagne flute",
+        "garnish": "Orange twist",
+        "steps": [
+          "Pour orange juice into flute.",
+          "Top up with sparkling wine gently.",
+          "Stir gently if needed.",
+          "Garnish with twist of orange."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Sparkling Wine / Champagne", "role": "modifier", "amount_ml": 100, "flavour_tags": ["sparkling", "grape", "dry"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 50, "flavour_tags": ["orange", "citrus", "zesty"]}
+      ]
+    },
+    {
+      "name": "Pimm’s Cup",
+      "success_score": 4.3,
+      "tags": ["fruit cup", "summer", "refreshing"],
+      "metadata": {
+        "glassware": "highball / tall",
+        "garnish": "Cucumber slice, orange slice, mint, strawberry",
+        "steps": [
+          "Fill a highball glass with ice.",
+          "Add Pimm’s and lemon juice.",
+          "Top with lemonade and stir gently.",
+          "Add ample fresh fruit and mint garnish."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Pimm’s No.1 Cup", "role": "base", "amount_ml": 50, "flavour_tags": ["pimms", "spiced", "herbal"]},
+        {"name": "Lemon Juice", "role": "juice", "amount_ml": 10, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Lemonade", "role": "top_up", "amount_ml": 100, "flavour_tags": ["lemon", "sparkling", "sweet"]}
+      ]
+    },
+    {
+      "name": "Greyhound",
+      "success_score": 4.1,
+      "tags": ["citrus", "bitter", "refreshing"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Twist of grapefruit or lemon",
+        "steps": [
+          "Fill glass with ice.",
+          "Add gin or vodka and grapefruit juice.",
+          "Stir gently.",
+          "Garnish with citrus twist."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin or Vodka", "role": "base", "amount_ml": 50, "flavour_tags": ["spirit", "clean", "botanical"]},
+        {"name": "Fresh Grapefruit Juice", "role": "juice", "amount_ml": 120, "flavour_tags": ["grapefruit", "citrus", "bitter"]}
+      ]
+    },
+    {
+      "name": "Sea Breeze",
+      "success_score": 4.2,
+      "tags": ["fruit", "citrus", "tart"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Lime wedge",
+        "steps": [
+          "Fill glass with ice.",
+          "Add vodka, cranberry juice, grapefruit juice.",
+          "Stir gently to combine.",
+          "Garnish with lime wedge."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 40, "flavour_tags": ["vodka", "clean", "neutral"]},
+        {"name": "Cranberry Juice", "role": "juice", "amount_ml": 90, "flavour_tags": ["cranberry", "berry", "tart"]},
+        {"name": "Grapefruit Juice", "role": "juice", "amount_ml": 30, "flavour_tags": ["grapefruit", "citrus", "bitter"]}
+      ]
+    },
+    {
+      "name": "Monkey Gland",
+      "success_score": 4.3,
+      "tags": ["citrus", "herbal", "sweet"],
+      "metadata": {
+        "glassware": "cocktail",
+        "garnish": "Orange twist",
+        "steps": [
+          "Add gin, orange juice, grenadine, absinthe to shaker with ice.",
+          "Shake well.",
+          "Strain into chilled cocktail glass.",
+          "Garnish if desired."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 45, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 45, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Grenadine", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["pomegranate", "sweet", "red"]},
+        {"name": "Absinthe", "role": "modifier", "amount_ml": 5, "flavour_tags": ["anise", "herbal", "intense"]}
+      ]
+    },
+    {
+      "name": "Breakfast Martini",
+      "success_score": 4.4,
+      "tags": ["citrus", "sweet", "breakfast"],
+      "metadata": {
+        "glassware": "cocktail",
+        "garnish": "Lemon twist",
+        "steps": [
+          "In a shaker, combine gin, Cointreau, lemon juice, and marmalade with ice.",
+          "Shake until well chilled.",
+          "Double-strain into cocktail glass.",
+          "Garnish with a twist of lemon."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Cointreau", "role": "modifier", "amount_ml": 18, "flavour_tags": ["orange", "citrus", "sweet"]},
+        {"name": "Fresh Lemon Juice", "role": "juice", "amount_ml": 18, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Orange Marmalade", "role": "modifier", "amount_ml": 10, "flavour_tags": ["orange", "preserve", "sweet"]}
+      ]
+    },
+    {
+      "name": "Ti’ Punch",
+      "success_score": 4.3,
+      "tags": ["caribbean", "bright", "zesty"],
+      "metadata": {
+        "glassware": "short glass",
+        "garnish": "Lime wedge",
+        "steps": [
+          "In the glass, squeeze lime wedge and drop in the pulp.",
+          "Add cane sugar syrup.",
+          "Add rhum over ice (optional or neat).",
+          "Stir gently or roll between glasses.",
+          "Garnish with extra lime if desired."
+        ],
+        "ice": "optional"
+      },
+      "ingredients": [
+        {"name": "Rhum Agricole Blanc", "role": "base", "amount_ml": 50, "flavour_tags": ["rhum", "agricole", "grassy"]},
+        {"name": "Lime Wedge", "role": "juice", "amount_ml": 10, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Raw Cane Sugar Syrup", "role": "sweetener", "amount_ml": 5, "flavour_tags": ["cane", "sweet", "molasses"]}
+      ]
+    },
+    {
+      "name": "Canchánchara",
+      "success_score": 4.2,
+      "tags": ["honey", "citrus", "traditional"],
+      "metadata": {
+        "glassware": "old fashioned",
+        "garnish": "Lime wedge or small mint sprig",
+        "steps": [
+          "Add rum, lime juice, and honey syrup to glass with ice.",
+          "Stir until well chilled.",
+          "Garnish and serve."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Cuban Rum", "role": "base", "amount_ml": 50, "flavour_tags": ["rum", "cuban", "light"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Honey Syrup", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["honey", "sweet", "floral"]}
+      ]
+    },
+    {
+      "name": "Clover Club",
+      "success_score": 4.4,
+      "tags": ["berry", "citrus", "smooth"],
+      "metadata": {
+        "glassware": "cocktail / coupe",
+        "garnish": "Fresh raspberry or lemon twist",
+        "steps": [
+          "Dry shake (no ice) gin, raspberry syrup, lemon juice, egg white if using.",
+          "Then add ice and shake vigorously.",
+          "Double-strain into chilled coupe.",
+          "Garnish with a raspberry or twist."
+        ],
+        "ice": "none"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 45, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Raspberry Syrup", "role": "modifier", "amount_ml": 15, "flavour_tags": ["raspberry", "berry", "sweet"]},
+        {"name": "Fresh Lemon Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lemon", "citrus", "bright"]},
+        {"name": "Egg White", "role": "modifier", "amount_ml": 15, "flavour_tags": ["egg", "texture", "silky"]}
+      ]
+    },
+    {
+      "name": "Cereza Sour",
+      "success_score": 4.3,
+      "tags": ["fruit", "sour", "cherry"],
+      "metadata": {
+        "glassware": "rocks",
+        "garnish": "Cherry or lime twist",
+        "steps": [
+          "Shake all ingredients without ice (if using egg white).",
+          "Then add ice and shake again.",
+          "Strain into a rocks glass over ice.",
+          "Garnish with cherry or twist."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Pisco or light grape brandy", "role": "base", "amount_ml": 50, "flavour_tags": ["pisco", "grape", "bright"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Cherry Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["cherry", "fruit", "tart"]},
+        {"name": "Simple Syrup", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["sugar", "sweet", "simple"]},
+        {"name": "Egg White", "role": "modifier", "amount_ml": 10, "flavour_tags": ["egg", "texture", "silky"]}
+      ]
+    },
+    {
+      "name": "Batida de Coco",
+      "success_score": 4.4,
+      "tags": ["tropical", "creamy", "sweet"],
+      "metadata": {
+        "glassware": "highball or hurricane",
+        "garnish": "Grated coconut or passion fruit half",
+        "steps": [
+          "Add all ingredients to shaker or blender with ice.",
+          "Shake or blend until smooth and well chilled.",
+          "Pour into glass.",
+          "Garnish."
+        ],
+        "ice": "blended"
+      },
+      "ingredients": [
+        {"name": "Cachaça", "role": "base", "amount_ml": 50, "flavour_tags": ["cachaca", "sugarcane", "earthy"]},
+        {"name": "Coconut Cream", "role": "modifier", "amount_ml": 25, "flavour_tags": ["coconut", "creamy", "sweet"]},
+        {"name": "Fresh Passion Fruit Juice", "role": "juice", "amount_ml": 50, "flavour_tags": ["passion fruit", "tropical", "tart"]}
+      ]
+    },
+    {
+      "name": "Mai Tai (classic version)",
+      "success_score": 4.6,
+      "tags": ["tropical", "nutty", "citrus"],
+      "metadata": {
+        "glassware": "double old fashioned",
+        "garnish": "Mint sprig and lime half",
+        "steps": [
+          "Shake all ingredients with ice.",
+          "Strain into glass with crushed ice.",
+          "Garnish with mint and lime."
+        ],
+        "ice": "crushed"
+      },
+      "ingredients": [
+        {"name": "Light Rum", "role": "base", "amount_ml": 30, "flavour_tags": ["rum", "light", "tropical"]},
+        {"name": "Dark / Aged Rum", "role": "base", "amount_ml": 30, "flavour_tags": ["rum", "dark", "molasses"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Orange Curaçao", "role": "modifier", "amount_ml": 15, "flavour_tags": ["orange", "citrus", "bitter"]},
+        {"name": "Orgeat", "role": "modifier", "amount_ml": 15, "flavour_tags": ["almond", "nutty", "sweet"]},
+        {"name": "Simple Syrup", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["sugar", "sweet", "simple"]}
+      ]
+    },
+    {
+      "name": "Chi-Chi",
+      "success_score": 4.2,
+      "tags": ["tropical", "sweet", "creamy"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Pineapple wedge or cherry",
+        "steps": [
+          "Shake vodka, coconut cream, and pineapple juice with ice.",
+          "Strain into highball glass over ice.",
+          "Garnish."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 50, "flavour_tags": ["vodka", "clean", "neutral"]},
+        {"name": "Coconut Cream", "role": "modifier", "amount_ml": 20, "flavour_tags": ["coconut", "creamy", "sweet"]},
+        {"name": "Pineapple Juice", "role": "juice", "amount_ml": 60, "flavour_tags": ["pineapple", "tropical", "vibrant"]}
+      ]
+    },
+    {
+      "name": "Hurricane",
+      "success_score": 4.5,
+      "tags": ["fruit", "strong", "tropical"],
+      "metadata": {
+        "glassware": "hurricane / tall",
+        "garnish": "Orange slice & cherry",
+        "steps": [
+          "Shake all ingredients with ice.",
+          "Strain into glass filled with crushed ice.",
+          "Garnish with fruit."
+        ],
+        "ice": "crushed"
+      },
+      "ingredients": [
+        {"name": "Light Rum", "role": "base", "amount_ml": 30, "flavour_tags": ["rum", "light", "tropical"]},
+        {"name": "Dark Rum", "role": "base", "amount_ml": 30, "flavour_tags": ["rum", "dark", "molasses"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Fresh Orange Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Passion Fruit Syrup", "role": "modifier", "amount_ml": 20, "flavour_tags": ["passion fruit", "tropical", "sweet"]},
+        {"name": "Grenadine", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["pomegranate", "sweet", "red"]}
+      ]
+    },
+    {
+      "name": "Planter’s Punch",
+      "success_score": 4.3,
+      "tags": ["fruit", "classic", "rich"],
+      "metadata": {
+        "glassware": "highball / tall",
+        "garnish": "Nutmeg, cherry & citrus slice",
+        "steps": [
+          "Shake or stir all ingredients with ice.",
+          "Strain into glass with fresh ice.",
+          "Garnish heavily."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Dark Rum", "role": "base", "amount_ml": 50, "flavour_tags": ["rum", "dark", "molasses"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Orange Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Pineapple Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["pineapple", "tropical", "vibrant"]},
+        {"name": "Grenadine", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["pomegranate", "sweet", "red"]},
+        {"name": "Angostura Bitters", "role": "modifier", "amount_ml": 2, "flavour_tags": ["bitters", "spice", "aromatic"]}
+      ]
+    },
+    {
+      "name": "Jungle Bird",
+      "success_score": 4.4,
+      "tags": ["bitter", "tropical", "balanced"],
+      "metadata": {
+        "glassware": "rocks or old fashioned",
+        "garnish": "Pineapple wedge or cherry",
+        "steps": [
+          "Shake all ingredients with ice.",
+          "Strain into glass over ice.",
+          "Garnish."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Dark Rum", "role": "base", "amount_ml": 45, "flavour_tags": ["rum", "dark", "molasses"]},
+        {"name": "Campari", "role": "modifier", "amount_ml": 15, "flavour_tags": ["bitter", "orange", "herbal"]},
+        {"name": "Fresh Pineapple Juice", "role": "juice", "amount_ml": 45, "flavour_tags": ["pineapple", "tropical", "vibrant"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 15, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Simple Syrup", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["sugar", "sweet", "simple"]}
+      ]
+    },
+    {
+      "name": "Painkiller",
+      "success_score": 4.5,
+      "tags": ["rich", "tropical", "creamy"],
+      "metadata": {
+        "glassware": "hurricane / tall",
+        "garnish": "Grated nutmeg",
+        "steps": [
+          "Add all ingredients to shaker with ice.",
+          "Shake lightly or gently stir.",
+          "Pour into glass (often unstrained).",
+          "Garnish."
+        ],
+        "ice": "crushed"
+      },
+      "ingredients": [
+        {"name": "Pusser’s Navy Rum", "role": "base", "amount_ml": 60, "flavour_tags": ["rum", "navy", "rich"]},
+        {"name": "Pineapple Juice", "role": "juice", "amount_ml": 90, "flavour_tags": ["pineapple", "tropical", "vibrant"]},
+        {"name": "Orange Juice", "role": "juice", "amount_ml": 30, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Cream of Coconut", "role": "modifier", "amount_ml": 30, "flavour_tags": ["coconut", "creamy", "sweet"]}
+      ]
+    },
+    {
+      "name": "South Side",
+      "success_score": 4.3,
+      "tags": ["herbal", "citrus", "fresh"],
+      "metadata": {
+        "glassware": "collins or highball",
+        "garnish": "Mint sprig",
+        "steps": [
+          "Muddle mint with sugar syrup and lime juice.",
+          "Add gin and ice.",
+          "Shake and double-strain (into glass).",
+          "Garnish with mint."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 50, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Sugar Syrup", "role": "sweetener", "amount_ml": 15, "flavour_tags": ["sugar", "sweet", "simple"]},
+        {"name": "Mint Leaves", "role": "modifier", "amount_ml": 0, "flavour_tags": ["mint", "herbal", "fresh"]}
+      ]
+    },
+    {
+      "name": "Singapore Sling",
+      "success_score": 4.4,
+      "tags": ["tropical", "fruit", "classic"],
+      "metadata": {
+        "glassware": "tall / sling glass",
+        "garnish": "Pineapple slice, cherry, twist",
+        "steps": [
+          "Shake all ingredients (except bitters) with ice.",
+          "Add bitters, stir or shake lightly.",
+          "Strain into glass over ice.",
+          "Garnish decoratively."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Gin", "role": "base", "amount_ml": 30, "flavour_tags": ["gin", "botanical", "juniper"]},
+        {"name": "Cherry Heering", "role": "modifier", "amount_ml": 15, "flavour_tags": ["cherry", "liqueur", "sweet"]},
+        {"name": "Bénédictine", "role": "modifier", "amount_ml": 7.5, "flavour_tags": ["herbal", "spice", "sweet"]},
+        {"name": "Cointreau", "role": "modifier", "amount_ml": 7.5, "flavour_tags": ["orange", "citrus", "sweet"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 15, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Pineapple Juice", "role": "juice", "amount_ml": 60, "flavour_tags": ["pineapple", "tropical", "vibrant"]},
+        {"name": "Angostura Bitters", "role": "modifier", "amount_ml": 2, "flavour_tags": ["bitters", "spice", "aromatic"]},
+        {"name": "Grenadine", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["pomegranate", "sweet", "red"]}
+      ]
+    },
+    {
+      "name": "Tropical Tequila Sunrise",
+      "success_score": 4.2,
+      "tags": ["fruit", "sunrise", "easy"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Orange slice, cherry",
+        "steps": [
+          "Add tequila and orange juice over ice.",
+          "Slowly pour grenadine so it sinks.",
+          "Do not stir – let gradient form.",
+          "Garnish with fruit."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Tequila", "role": "base", "amount_ml": 50, "flavour_tags": ["tequila", "agave", "earthy"]},
+        {"name": "Orange Juice", "role": "juice", "amount_ml": 100, "flavour_tags": ["orange", "citrus", "zesty"]},
+        {"name": "Grenadine", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["pomegranate", "sweet", "red"]}
+      ]
+    },
+    {
+      "name": "Moscow Mule",
+      "success_score": 4.3,
+      "tags": ["spicy", "citrus", "refreshing"],
+      "metadata": {
+        "glassware": "copper mug / highball",
+        "garnish": "Lime wedge & mint",
+        "steps": [
+          "Add vodka and lime juice to mug with ice.",
+          "Top with ginger beer.",
+          "Stir gently.",
+          "Garnish."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "Vodka", "role": "base", "amount_ml": 45, "flavour_tags": ["vodka", "clean", "neutral"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 15, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Ginger Beer", "role": "top_up", "amount_ml": 120, "flavour_tags": ["ginger", "spicy", "sparkling"]}
+      ]
+    },
+    {
+      "name": "Cuba Libre",
+      "success_score": 4.1,
+      "tags": ["sweet", "cola", "citrus"],
+      "metadata": {
+        "glassware": "highball",
+        "garnish": "Lime wedge",
+        "steps": [
+          "Add rum and lime juice to glass with ice.",
+          "Top with cola.",
+          "Stir gently.",
+          "Garnish."
+        ],
+        "ice": "cubed"
+      },
+      "ingredients": [
+        {"name": "White Rum", "role": "base", "amount_ml": 50, "flavour_tags": ["rum", "light", "tropical"]},
+        {"name": "Fresh Lime Juice", "role": "juice", "amount_ml": 20, "flavour_tags": ["lime", "citrus", "zesty"]},
+        {"name": "Coca-Cola", "role": "top_up", "amount_ml": 100, "flavour_tags": ["cola", "sweet", "caramel"]}
+      ]
+    }
+  ]
+}
