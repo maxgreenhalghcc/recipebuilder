@@ -1,0 +1,51 @@
+{
+  "low": {
+    "tags": ["low-bitter", "smooth"],
+    "taste_bias": {"sweet": 0.36, "sour": 0.36, "bitter": 0.12, "salt": 0.08, "umami": 0.08},
+    "taste_caps": {"bitter": 0.15},
+    "candidate_bias": {
+      "families": {
+        "amaro": 0.6,
+        "aperitivo": 0.7,
+        "tonic_water": 0.7,
+        "grapefruit": 0.7,
+        "bitters_orange": 0.8,
+        "bitters_aromatic": 0.6
+      }
+    },
+    "explain": "Bitterness low → cap bittering, prefer smooth citrus/honey cues; limit amaro/tonic/grapefruit.",
+    "learning_hooks": ["record_bitter_inputs", "record_guest_score"]
+  },
+  "medium": {
+    "tags": ["balanced-bitter"],
+    "taste_caps": {"bitter": 0.35},
+    "candidate_bias": {
+      "families": {
+        "amaro": 1.0,
+        "aperitivo": 1.0,
+        "tonic_water": 1.0,
+        "grapefruit": 1.0,
+        "bitters_orange": 1.0,
+        "bitters_aromatic": 1.0
+      }
+    },
+    "explain": "Bitterness medium → full toolkit available; keep bitterness in balance.",
+    "learning_hooks": ["record_bitter_inputs", "record_guest_score"]
+  },
+  "high": {
+    "tags": ["bitter-friendly", "grown-up"],
+    "taste_bias": {"bitter": 0.32, "sweet": 0.28, "sour": 0.24, "salt": 0.08, "umami": 0.08},
+    "taste_caps": {"bitter": 0.55},
+    "candidate_bias": {
+      "families": {
+        "amaro": 1.3,
+        "aperitivo": 1.2,
+        "tonic_water": 1.2,
+        "grapefruit": 1.25,
+        "bitters_aromatic": 1.2
+      }
+    },
+    "explain": "Bitterness high → raise bitter ceiling; encourage amaro/tonic/grapefruit and aromatic bitters.",
+    "learning_hooks": ["record_bitter_inputs", "record_guest_score"]
+  }
+}

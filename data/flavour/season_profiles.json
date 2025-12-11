@@ -1,0 +1,62 @@
+{
+  "spring": {
+    "aroma_tags": ["floral", "herbal", "citrus", "fresh"],
+    "taste_bias": {"sweet": 0.35, "sour": 0.45, "bitter": 0.10, "salt": 0.05, "umami": 0.05},
+    "structure_bias": {"strength_abv": "mid", "body": -0.1, "sparkle": 0.4, "temperature": "cold"},
+    "preferred_templates": {"tpl_shaken_sour": 0.5, "tpl_collins": 0.3, "tpl_highball": 0.2},
+    "sweet_acid_window": [0.55, 0.75],
+    "base_spirit_bias": {"gin": 0.45, "vodka": 0.25, "rum": 0.15, "tequila": 0.10, "bourbon": 0.05},
+    "juice_pool": ["lemon juice", "orange juice", "apple juice"],
+    "sweeteners_pool": ["simple syrup", "honey syrup", "elderflower syrup"],
+    "modifiers_pool": ["elderflower liqueur", "dry vermouth", "citrus liqueur", "rhubarb liqueur"],
+    "herbs_spices": ["mint", "basil", "cucumber"],
+    "garnishes": ["mint sprig", "lemon twist", "edible flowers"],
+    "lengtheners": ["soda water", "tonic water"],
+    "avoid_or_reduce": ["heavy cream", "dark molasses notes"]
+  },
+  "summer": {
+    "aroma_tags": ["tropical", "citrus", "fresh", "zesty"],
+    "taste_bias": {"sweet": 0.40, "sour": 0.45, "bitter": 0.08, "salt": 0.04, "umami": 0.03},
+    "structure_bias": {"strength_abv": "low_mid", "body": -0.15, "sparkle": 0.6, "temperature": "very_cold"},
+    "preferred_templates": {"tpl_highball": 0.45, "tpl_collins": 0.3, "tpl_shaken_sour": 0.25},
+    "sweet_acid_window": [0.60, 0.85],
+    "base_spirit_bias": {"rum": 0.35, "tequila": 0.25, "vodka": 0.25, "gin": 0.10, "bourbon": 0.05},
+    "juice_pool": ["pineapple juice", "passion fruit juice", "lime juice", "watermelon juice"],
+    "sweeteners_pool": ["simple syrup", "vanilla syrup", "agave syrup"],
+    "modifiers_pool": ["citrus liqueur", "aperitivo", "passion fruit liqueur"],
+    "herbs_spices": ["mint", "lemongrass", "ginger"],
+    "garnishes": ["citrus wheels", "mint sprig", "fresh fruit"],
+    "lengtheners": ["soda water", "lemonade"],
+    "avoid_or_reduce": ["heavy bitters load", "cream"]
+  },
+  "autumn": {
+    "aroma_tags": ["woody", "spice", "stone-fruit", "caramel"],
+    "taste_bias": {"sweet": 0.45, "sour": 0.30, "bitter": 0.15, "salt": 0.05, "umami": 0.05},
+    "structure_bias": {"strength_abv": "mid_high", "body": 0.15, "sparkle": 0.15, "temperature": "cold"},
+    "preferred_templates": {"tpl_collins": 0.4, "tpl_martini_style": 0.35, "tpl_highball": 0.25},
+    "sweet_acid_window": [0.70, 0.95],
+    "base_spirit_bias": {"bourbon": 0.40, "rum": 0.30, "brandy": 0.15, "tequila": 0.10, "gin": 0.05},
+    "juice_pool": ["cranberry juice", "apple juice", "pear juice", "orange juice"],
+    "sweeteners_pool": ["maple syrup", "honey syrup", "demerara syrup"],
+    "modifiers_pool": ["amaretto", "amaro", "aromatic bitters", "ginger liqueur"],
+    "herbs_spices": ["rosemary", "cinnamon", "clove", "star anise"],
+    "garnishes": ["rosemary sprig", "orange peel", "star anise"],
+    "lengtheners": ["ginger ale", "soda water"],
+    "avoid_or_reduce": ["overt tropical coconut"]
+  },
+  "winter": {
+    "aroma_tags": ["vanilla", "caramel", "baking spice", "chocolate", "coffee"],
+    "taste_bias": {"sweet": 0.50, "sour": 0.25, "bitter": 0.15, "salt": 0.05, "umami": 0.05},
+    "structure_bias": {"strength_abv": "mid_high", "body": 0.30, "sparkle": 0.05, "temperature": "cold_or_warm"},
+    "preferred_templates": {"tpl_martini_style": 0.45, "tpl_shaken_sour": 0.25, "tpl_collins": 0.20, "tpl_highball": 0.10},
+    "sweet_acid_window": [0.75, 1.05],
+    "base_spirit_bias": {"bourbon": 0.35, "rum": 0.30, "brandy": 0.20, "vodka": 0.10, "gin": 0.05},
+    "juice_pool": ["passion fruit juice", "orange juice", "blood orange juice"],
+    "sweeteners_pool": ["vanilla syrup", "caramel syrup", "demerara syrup"],
+    "modifiers_pool": ["coffee liqueur", "cocoa liqueur", "aromatic bitters"],
+    "herbs_spices": ["nutmeg", "cinnamon", "allspice"],
+    "garnishes": ["orange twist", "maraschino cherry", "grated nutmeg"],
+    "lengtheners": [],
+    "avoid_or_reduce": ["icy spritz profiles"]
+  }
+}

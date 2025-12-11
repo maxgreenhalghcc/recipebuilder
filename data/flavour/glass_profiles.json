@@ -1,0 +1,60 @@
+{
+  "beach house": {
+    "glass": {"type": "long glass", "min_ml": 320},
+    "ice": "cubed",
+    "templates": {"tpl_highball": 0.55, "tpl_collins": 0.35, "tpl_shaken_sour": 0.10},
+    "constraints": {
+      "abv_range": [6, 14],
+      "lengthener_allowed": true,
+      "sparkle_allowed": true,
+      "ingredient_count_max": 5
+    },
+    "sweet_acid_window": [0.60, 0.85],
+    "garnishes": ["lemon wheel", "mint sprig", "orange wheel"],
+    "lengtheners": ["soda water", "lemonade"],
+    "structure_bias": {"sparkle": 0.6, "strength_abv": "low_mid", "body": -0.1}
+  },
+  "modern house": {
+    "glass": {"type": "martini glass", "min_ml": 160},
+    "ice": "none",
+    "templates": {"tpl_martini_style": 0.75, "tpl_shaken_sour": 0.25},
+    "constraints": {
+      "abv_range": [18, 28],
+      "lengthener_allowed": false,
+      "sparkle_allowed": false,
+      "ingredient_count_max": 5
+    },
+    "sweet_acid_window": [0.55, 0.75],
+    "garnishes": ["lemon twist", "orange twist", "olive"],
+    "structure_bias": {"sparkle": -0.4, "strength_abv": "mid_high", "body": 0.05}
+  },
+  "haunted house": {
+    "glass": {"type": "skull glass", "min_ml": 200},
+    "ice": "crushed",
+    "templates": {"tpl_collins": 0.4, "tpl_martini_style": 0.2, "tpl_highball": 0.2, "tpl_shaken_sour": 0.2},
+    "constraints": {
+      "abv_range": [14, 24],
+      "lengthener_allowed": false,
+      "sparkle_allowed": false,
+      "ingredient_count_max": 6
+    },
+    "sweet_acid_window": [0.70, 0.95],
+    "garnishes": ["rosemary sprig", "maraschino cherry", "star anise"],
+    "structure_bias": {"sparkle": -0.3, "strength_abv": "mid_high", "body": 0.2}
+  },
+  "tree house": {
+    "glass": {"type": "gin glass", "min_ml": 260},
+    "ice": "cubed",
+    "templates": {"tpl_highball": 0.45, "tpl_collins": 0.35, "tpl_martini_style": 0.05, "tpl_shaken_sour": 0.15},
+    "constraints": {
+      "abv_range": [6, 14],
+      "lengthener_allowed": true,
+      "sparkle_allowed": true,
+      "ingredient_count_max": 6
+    },
+    "sweet_acid_window": [0.60, 0.85],
+    "garnishes": ["mint sprig", "basil", "lemon wheel"],
+    "lengtheners": ["soda water", "tonic water"],
+    "structure_bias": {"sparkle": 0.5, "strength_abv": "low_mid", "body": -0.05}
+  }
+}
