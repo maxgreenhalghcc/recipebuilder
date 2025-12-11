@@ -150,6 +150,7 @@ class StockItem:
     neutral: bool = False
     flavour_tags: Sequence[str] = field(default_factory=list)
     default_measure_ml: float = 0.0
+    spirit_subtype: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "StockItem":
@@ -172,6 +173,7 @@ class StockItem:
         avoid_profiles = set(_coerce_string_list(data.get("avoid_profiles")))
         neutral = bool(data.get("neutral", False))
         default_measure_ml = float(data.get("default_measure_ml", 0.0) or 0.0)
+        spirit_subtype = str(data.get("spirit_subtype") or "").strip().lower() or None
 
         return cls(
             name=name,
@@ -182,6 +184,7 @@ class StockItem:
             neutral=neutral,
             flavour_tags=flavour_tags,
             default_measure_ml=default_measure_ml,
+            spirit_subtype=spirit_subtype,
         )
 
 
@@ -723,6 +726,7 @@ class StockRepository:
         normalized_name = _normalize(name)
         category = _normalize(item.category)
         role = _normalize(item.role)
+        spirit_subtype = item.spirit_subtype or _infer_spirit_subtype(normalized_name)
         if not role:
             role = {
                 "spirit": "base",
@@ -749,6 +753,17 @@ class StockRepository:
         avoid_profiles = {p.lower() for p in item.avoid_profiles}
         neutral = bool(item.neutral)
 
+        family = extract_spirit_family(name)
+        if family == "rum" and spirit_subtype == "light":
+            profiles.add("citrus_fresh")
+            avoid_profiles.discard("citrus_fresh")
+
+        # Normalise schnapps as modifiers (not bases)
+        if "schnapps" in normalized_name:
+            category = "modifier"
+            role = "modifier"
+            default_measure = 20.0
+
         # Neutral staples
         if normalized_name in {"lemon juice", "lime juice", "soda", "soda water", "club soda"}:
             neutral = True
@@ -770,6 +785,10 @@ class StockRepository:
             avoid_profiles.update(extra_avoids)
             neutral = neutral or inferred_neutral
 
+        if family == "rum" and spirit_subtype == "light":
+            profiles.add("citrus_fresh")
+            avoid_profiles.discard("citrus_fresh")
+
         return StockItem(
             name=name,
             category=category,  # type: ignore[arg-type]
@@ -779,6 +798,7 @@ class StockRepository:
             neutral=neutral,
             flavour_tags=item.flavour_tags,
             default_measure_ml=default_measure,
+            spirit_subtype=spirit_subtype,
         )
 
     def items_for_profile(self, profile: str, *, role: str | None = None) -> List[StockItem]:
@@ -892,6 +912,21 @@ def extract_spirit_family(name: str) -> str | None:
     for fam in BASE_SPIRIT_FAMILIES:
         if fam in lower:
             return fam
+    return None
+
+
+def _infer_spirit_subtype(name: str) -> Optional[str]:
+    """Lightweight spirit subtype inference for rum/tequila variants."""
+
+    lower = _normalize(name)
+    if "spiced" in lower:
+        return "spiced"
+    if any(token in lower for token in ["dark", "anejo", "aged", "gold"]):
+        return "dark"
+    if any(token in lower for token in ["white", "light", "silver", "blanco"]):
+        return "light"
+    if "reposado" in lower:
+        return "anejo"
     return None
 
 

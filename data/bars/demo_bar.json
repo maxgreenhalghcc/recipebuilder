@@ -157,7 +157,8 @@
         "citrus_fresh",
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "light"
     },
     {
       "name": "Dark Rum",
@@ -184,7 +185,8 @@
         "citrus_fresh",
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "dark"
     },
     {
       "name": "Spiced Rum",
@@ -210,7 +212,8 @@
         "citrus_fresh",
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "spiced"
     },
     {
       "name": "Aged Rum",
@@ -238,7 +241,8 @@
         "citrus_fresh",
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "dark"
     },
     {
       "name": "Blended Scotch",
@@ -331,7 +335,8 @@
         "candy_fun",
         "dessert"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "light"
     },
     {
       "name": "Tequila Reposado",
@@ -356,7 +361,8 @@
         "candy_fun",
         "dessert"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "anejo"
     },
     {
       "name": "Mezcal",

@@ -149,7 +149,8 @@
       ],
       "default_measure_ml": 50.0,
       "role": "base",
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "light"
     },
     {
       "name": "Dark Rum",
@@ -176,7 +177,8 @@
         "citrus_fresh",
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "dark"
     },
     {
       "name": "Spiced Rum",
@@ -202,7 +204,8 @@
         "citrus_fresh",
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "spiced"
     },
     {
       "name": "Malibu",
@@ -429,7 +432,8 @@
       "avoid_profiles": [
         "classic_boozy"
       ],
-      "neutral": false
+      "neutral": false,
+      "spirit_subtype": "light"
     },
     {
       "name": "Vanilla Syrup",

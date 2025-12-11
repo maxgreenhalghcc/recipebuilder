@@ -1,11 +1,59 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Set
 
 import pytest
 
 from recipebuilder.profile_builder import PROFILES, ProfileRecipeBuilder, choose_profile
-from recipebuilder.recipe_engine import StockRepository
+from recipebuilder.recipe_engine import StockItem, StockRepository
+
+
+class _MiniRepository:
+    def __init__(self, items):
+        self._all_items = list(items)
+        cache = defaultdict(list)
+        for item in self._all_items:
+            profiles = item.profiles or {"neutral"}
+            for profile in profiles:
+                cache[profile].append(item)
+            if item.neutral:
+                cache["neutral"].append(item)
+        self._profile_cache = cache
+
+    def items_for_profile(self, profile, *, role=None):
+        items = [
+            item
+            for item in self._profile_cache.get(profile, [])
+            if (profile in item.profiles or item.neutral) and profile not in item.avoid_profiles
+        ]
+        if role:
+            items = [i for i in items if i.role == role]
+        return items
+
+    def neutral_items(self, *, role=None):
+        items = [i for i in self._all_items if i.neutral]
+        if role:
+            items = [i for i in items if i.role == role]
+        return items
+
+    def find_flavoured_spirits(self, base_family, flavour, profile=None):
+        flavour = flavour.lower()
+        results = []
+        for item in self._all_items:
+            if item.category != "spirit":
+                continue
+            if base_family not in item.name.lower():
+                continue
+            if flavour not in item.name.lower():
+                continue
+            if profile and profile in item.avoid_profiles:
+                continue
+            results.append(item)
+        return results
+
+    def prime_cache(self, bar_id):
+        return self._all_items
 
 
 def _assert_profile_compatibility(profile: str, names: Set[str], suggestions):
@@ -120,3 +168,93 @@ def test_no_creamy_items_in_profiles():
     for profile in PROFILES:
         recipe = builder.build_recipe(responses, profile=profile, seed=3)
         assert all(not ("cream" in s.ingredient.name.lower()) for s in recipe.ingredients)
+
+
+def test_pineapple_ratio_is_capped():
+    items = [
+        StockItem(
+            name="Spiced Rum",
+            category="spirit",
+            role="base",
+            profiles={"tropical"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=50.0,
+            spirit_subtype="spiced",
+        ),
+        StockItem(
+            name="Orange Juice",
+            category="juice",
+            role="juice",
+            profiles={"tropical"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=40.0,
+        ),
+        StockItem(
+            name="Pineapple Juice",
+            category="juice",
+            role="juice",
+            profiles={"tropical"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=30.0,
+        ),
+        StockItem(
+            name="Lemon Juice",
+            category="sour",
+            role="sour",
+            profiles={"tropical"},
+            avoid_profiles=set(),
+            neutral=True,
+            default_measure_ml=20.0,
+        ),
+        StockItem(
+            name="Lemonade",
+            category="mixer",
+            role="mixer",
+            profiles={"tropical"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=75.0,
+        ),
+    ]
+
+    repo = _MiniRepository(items)
+    builder = ProfileRecipeBuilder(repo)
+    responses = {
+        "bar_id": "demo", "house_type": "beach house", "base_spirit": "rum", "carbonation_texture": "properly sparkling"
+    }
+
+    recipe = builder.build_recipe(responses, profile="tropical", seed=11)
+
+    pineapple = sum(s.amount_ml for s in recipe.ingredients if "pineapple" in s.ingredient.name.lower())
+    juice_total = sum(s.amount_ml for s in recipe.ingredients if s.role in {"juice", "sour"})
+    assert pineapple <= 0.25 * juice_total + 1e-6
+
+
+def test_rum_subtypes_follow_profile():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    tropical = {
+        "bar_id": "demo-bar",
+        "house_type": "beach house",
+        "base_spirit": "rum",
+        "carbonation_texture": "properly sparkling",
+    }
+    tropical_recipe = builder.build_recipe(tropical, profile="tropical", seed=5)
+    base_name = next(s.ingredient.name for s in tropical_recipe.ingredients if s.role == "base")
+    assert any(token in base_name.lower() for token in ["spiced", "dark", "aged"])
+
+    citrus = {
+        "bar_id": "demo-bar",
+        "house_type": "modern house",
+        "base_spirit": "rum",
+        "carbonation_texture": "still",
+        "abv_lane": "medium",
+    }
+    citrus_recipe = builder.build_recipe(citrus, profile="citrus_fresh", seed=9)
+    citrus_base = next(s.ingredient.name for s in citrus_recipe.ingredients if s.role == "base")
+    assert "white" in citrus_base.lower() or "light" in citrus_base.lower()

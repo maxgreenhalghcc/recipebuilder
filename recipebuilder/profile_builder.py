@@ -237,10 +237,70 @@ class ProfileRecipeBuilder:
         self.glass_logic = glass_logic
 
     def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe:
-        rnd = random.Random(seed)
-        stock = self.repository.prime_cache(responses.get("bar_id", "")) if hasattr(self.repository, "prime_cache") else self.repository.load_bar_stock(responses.get("bar_id", ""))
+        bar_key = (responses.get("bar_id") or "").strip().lower()
+        seeds: List[int] = []
+        base_seed = seed if seed is not None else random.getrandbits(32)
+        seeds.append(base_seed)
+        rnd_for_variants = random.Random(base_seed)
+        while len(seeds) < 3:
+            seeds.append(rnd_for_variants.getrandbits(32))
+
+        stock = (
+            self.repository.prime_cache(responses.get("bar_id", ""))
+            if hasattr(self.repository, "prime_cache")
+            else self.repository.load_bar_stock(responses.get("bar_id", ""))
+        )
         all_items = [item for item in getattr(self.repository, "_all_items", stock) if not is_creamy(item)]
 
+        candidates: List[CocktailRecipe] = []
+        for variant_seed in seeds:
+            rnd = random.Random(variant_seed)
+            candidates.append(self._build_single(responses, profile, rnd, all_items))
+
+        chosen = self._pick_diverse_candidate(bar_key, candidates)
+        return chosen
+
+    _recent_recipes: Dict[str, List[frozenset[str]]] = {}
+
+    def _pick_diverse_candidate(self, bar_key: str, candidates: Sequence[CocktailRecipe]) -> CocktailRecipe:
+        recent = self._recent_recipes.setdefault(bar_key, [])
+
+        def signature(recipe: CocktailRecipe) -> frozenset[str]:
+            names = [s.ingredient.name.lower() for s in recipe.ingredients if s.role != "mixer"]
+            return frozenset(names)
+
+        def diversity_score(sig: frozenset[str]) -> float:
+            if not recent:
+                return 1.0
+            overlap_scores = []
+            for past in recent:
+                if not past:
+                    continue
+                overlap = len(sig & past) / max(1, len(sig | past))
+                overlap_scores.append(1.0 - overlap)
+            return min(overlap_scores) if overlap_scores else 1.0
+
+        best: tuple[float, CocktailRecipe] | None = None
+        for recipe in candidates:
+            sig = signature(recipe)
+            score = diversity_score(sig)
+            if best is None or score > best[0]:
+                best = (score, recipe)
+
+        chosen = best[1] if best else candidates[0]
+        chosen_sig = signature(chosen)
+        recent.append(chosen_sig)
+        if len(recent) > 5:
+            recent.pop(0)
+        return chosen
+
+    def _build_single(
+        self,
+        responses: Dict[str, Any],
+        profile: str,
+        rnd: random.Random,
+        all_items: Sequence[StockItem],
+    ) -> CocktailRecipe:
         abv_lane = (responses.get("abv_lane") or "medium").strip().lower()
         base_target = {"strong": 60.0, "medium": 50.0, "low": 40.0}.get(abv_lane, 50.0)
 
@@ -252,6 +312,7 @@ class ProfileRecipeBuilder:
             items = [item for item in self.repository.items_for_profile(profile, role=role) if not is_creamy(item)]
             if role != "garnish":
                 items.extend([i for i in self.repository.neutral_items(role=role) if not is_creamy(i)])
+            rnd.shuffle(items)
             unique = []
             seen = set()
             for item in items:
@@ -262,9 +323,9 @@ class ProfileRecipeBuilder:
                 unique.append(item)
             return unique
 
-        prefs = self._profile_preferences(profile)
+        prefs = self._profile_preferences(profile, responses)
 
-        base = self._choose_base(responses, profile, profile_items("base"), prefs["base_keywords"])
+        base = self._choose_base(responses, profile, profile_items("base"), prefs["base_keywords"], prefs)
         if base is None:
             raise ValueError("No base spirit available for the selected profile.")
 
@@ -272,7 +333,7 @@ class ProfileRecipeBuilder:
 
         juice_pool = profile_items("juice")
         core_juices = [i for i in juice_pool if _is_core_juice(i)]
-        juices = self._choose_juices(core_juices, prefs["juice_keywords"], limit=2)
+        juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=2)
         sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
             profile,
             base_family,
@@ -360,7 +421,7 @@ class ProfileRecipeBuilder:
         if mixer_item and mixer_ml > 0:
             suggestions.append(IngredientSuggestion(mixer_item, mixer_ml, "mixer"))
 
-        garnish = self._pick_garnish(profile_items("garnish"), juices, prefs["garnish_keywords"])
+        garnish = self._pick_garnish(self.repository.items_for_profile(profile, role="garnish"), juices, prefs["garnish_keywords"])
         steps = self._build_steps(glass.name, mixer_item.name if mixer_item else None)
 
         self._validate(profile, suggestions)
@@ -377,7 +438,7 @@ class ProfileRecipeBuilder:
             explanations=(),
         )
 
-    def _profile_preferences(self, profile: str) -> Dict[str, Any]:
+    def _profile_preferences(self, profile: str, responses: Dict[str, Any] | None = None) -> Dict[str, Any]:
         defaults = {
             "base_keywords": ["vodka"],
             "juice_keywords": ["orange"],
@@ -388,15 +449,17 @@ class ProfileRecipeBuilder:
             "needs_sour": True,
             "sour_ml": 12.0,
             "juice_ml": (25.0, 40.0),
+            "juice_priority": None,
         }
         profiles: Dict[str, Dict[str, Any]] = {
             "tropical": {
                 "base_keywords": ["rum", "vodka"],
-                "juice_keywords": ["pineapple", "orange", "passion"],
+                "juice_keywords": ["pineapple", "orange", "passion", "cranberry"],
                 "sweetener_keywords": ["grenadine", "vanilla", "passion", "coconut"],
                 "modifier_keywords": ["liqueur", "schnapps", "falernum"],
                 "mixer_keywords": ["lemonade"],
                 "garnish_keywords": ["orange", "pineapple", "mint"],
+                "juice_priority": ["orange", "cranberry", "passion", "pineapple"],
             },
             "berry": {
                 "base_keywords": ["gin", "vodka"],
@@ -440,7 +503,17 @@ class ProfileRecipeBuilder:
                 "juice_ml": (20.0, 30.0),
             },
         }
-        return {**defaults, **profiles.get(profile, {})}
+        prefs = {**defaults, **profiles.get(profile, {})}
+
+        house = (responses or {}).get("house_type")
+        if house:
+            house_lower = house.lower()
+            if "beach" in house_lower and profile == "tropical":
+                prefs["juice_priority"] = ["orange", "cranberry", "passion", "pineapple"]
+            if "tree" in house_lower and not prefs.get("juice_priority"):
+                prefs["juice_priority"] = ["orange", "cranberry", "lemon"]
+
+        return prefs
 
     def _choose_glass(self, responses: Dict[str, Any], carbonation: str) -> Glass:
         mapping = {
@@ -456,24 +529,70 @@ class ProfileRecipeBuilder:
             return Glass("long glass", 400, sparkling=True)
         return Glass("martini glass", 250, sparkling=False)
 
-    def _choose_base(self, responses: Dict[str, Any], profile: str, items: Sequence[StockItem], keywords: Sequence[str]) -> Optional[StockItem]:
+    def _choose_base(
+        self,
+        responses: Dict[str, Any],
+        profile: str,
+        items: Sequence[StockItem],
+        keywords: Sequence[str],
+        prefs: Dict[str, Any],
+    ) -> Optional[StockItem]:
         desired = (responses.get("base_spirit") or "").lower()
-        if desired:
-            match = _pick_first_matching(items, [desired])
-            if match:
-                return match
-        preferred = _pick_first_matching(items, keywords)
-        return preferred or (items[0] if items else None)
 
-    def _choose_juices(self, items: Sequence[StockItem], keywords: Sequence[str], limit: int) -> List[StockItem]:
+        def subtype_score(item: StockItem) -> float:
+            subtype = getattr(item, "spirit_subtype", None) or ""
+            family = extract_spirit_family(item.name) or ""
+            score = 0.0
+            if family == "rum":
+                if subtype in {"spiced", "dark", "anejo"}:
+                    score += 2.0 if profile in {"tropical", "dessert", "candy_fun", "classic_boozy"} else 1.0
+                if subtype in {"light"}:
+                    score += 2.0 if profile in {"citrus_fresh", "berry"} else 0.5
+            return score
+
+        if desired:
+            desired_items = [item for item in items if desired in item.name.lower() or desired in item.category.lower() or desired in item.role]
+            if desired_items:
+                return max(desired_items, key=subtype_score)
+            fallback_pool = [
+                item
+                for item in getattr(self.repository, "_all_items", [])
+                if item.role == "base" and desired in item.name.lower() and not is_creamy(item)
+            ]
+            if fallback_pool:
+                return max(fallback_pool, key=subtype_score)
+        ranked = sorted(items, key=subtype_score, reverse=True)
+        preferred = _pick_first_matching(ranked, keywords)
+        return preferred or (ranked[0] if ranked else None)
+
+    def _choose_juices(
+        self,
+        items: Sequence[StockItem],
+        keywords: Sequence[str],
+        priority: Optional[Sequence[str]],
+        rnd: random.Random,
+        limit: int,
+    ) -> List[StockItem]:
         filtered = [i for i in items if not is_creamy(i)]
         picks: List[StockItem] = []
-        for keyword in keywords:
-            match = _pick_first_matching([i for i in filtered if i not in picks], [keyword])
+        ordered_keywords = list(priority or []) + [kw for kw in keywords if kw not in (priority or [])]
+        for keyword in ordered_keywords:
+            pool = [i for i in filtered if i not in picks]
+            match = _pick_first_matching(pool, [keyword])
             if match and match not in picks:
                 picks.append(match)
             if len(picks) >= limit:
                 break
+        if len(picks) < limit:
+            remainder = [i for i in filtered if i not in picks]
+            rnd.shuffle(remainder)
+            picks.extend(remainder[: limit - len(picks)])
+        # Ensure pineapple is secondary if other options exist
+        pineapples = [p for p in picks if "pineapple" in p.name.lower()]
+        if pineapples and len(picks) > 1:
+            primary_candidates = [p for p in picks if p not in pineapples]
+            if primary_candidates:
+                picks = primary_candidates[:1] + pineapples[:1]
         return picks[:limit]
 
     def _choose_sweet_components(
@@ -600,10 +719,12 @@ class ProfileRecipeBuilder:
         glass: Glass,
         ml_range: tuple[float, float],
     ) -> tuple[List[float], float]:
-        if not glass.sparkling or not juices:
+        if not juices:
             return list(juice_amounts), sour_ml
 
         target_low, target_high = 70.0, 100.0
+        if glass.capacity_ml < 350:
+            target_low, target_high = 40.0, 80.0
         juice_list = list(juice_amounts)
         pre_mixer = sum(juice_list) + sour_ml
         base_min, base_max = ml_range
@@ -623,7 +744,46 @@ class ProfileRecipeBuilder:
             juice_list = [clamp(amt * scale, base_min, base_max) for amt in juice_list]
             sour_ml = clamp(sour_ml * scale, 10.0, 25.0)
 
+        juice_list = self._cap_pineapple_ratio(juices, juice_list, sour_ml)
+
         return juice_list, sour_ml
+
+    def _cap_pineapple_ratio(
+        self,
+        juices: Sequence[StockItem],
+        juice_amounts: Sequence[float],
+        sour_ml: float,
+        max_ratio: float = 0.25,
+    ) -> List[float]:
+        pineapple_indices = [idx for idx, juice in enumerate(juices) if "pineapple" in juice.name.lower()]
+        if not pineapple_indices:
+            return list(juice_amounts)
+
+        total_juice = sum(juice_amounts) + sour_ml
+        if total_juice <= 0:
+            return list(juice_amounts)
+
+        pineapple_total = sum(juice_amounts[idx] for idx in pineapple_indices)
+        allowed = max_ratio * total_juice
+        if pineapple_total <= allowed:
+            return list(juice_amounts)
+
+        scale = allowed / pineapple_total if pineapple_total > 0 else 1.0
+        adjusted = list(juice_amounts)
+        reclaimed = 0.0
+        for idx in pineapple_indices:
+            new_amt = adjusted[idx] * scale
+            reclaimed += adjusted[idx] - new_amt
+            adjusted[idx] = new_amt
+
+        if reclaimed > 0:
+            non_pineapple = [i for i in range(len(adjusted)) if i not in pineapple_indices]
+            if non_pineapple:
+                share = reclaimed / len(non_pineapple)
+                for idx in non_pineapple:
+                    adjusted[idx] += share
+
+        return adjusted
 
     def _select_mixer(self, mixers: Sequence[StockItem], keywords: Sequence[str], carbonation: str) -> Optional[StockItem]:
         if not mixers and not carbonation.startswith("properly"):
