@@ -1,0 +1,12 @@
+{
+  "name": "Peardrop",
+  "success_score": 4.7,
+  "max_score": 5,
+  "tags": ["candy", "pear", "long"],
+  "metadata": {"glassware": "long glass", "ice": "cubed"},
+  "ingredients": [
+    {"name": "Vodka", "role": "base", "amount_ml": 50, "flavour_tags": ["vodka", "clean", "neutral"]},
+    {"name": "Peardrop Liqueur", "role": "modifier", "amount_ml": 50, "flavour_tags": ["pear", "candy", "fruity"]},
+    {"name": "Lemonade", "role": "juice", "amount_ml": 120, "flavour_tags": ["citrus", "sparkling", "sweet"]}
+  ]
+}
