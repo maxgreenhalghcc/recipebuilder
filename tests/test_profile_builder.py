@@ -5,7 +5,12 @@ from typing import Set
 
 import pytest
 
-from recipebuilder.profile_builder import PROFILES, ProfileRecipeBuilder, choose_profile
+from recipebuilder.profile_builder import (
+    PROFILES,
+    ProfileRecipeBuilder,
+    _ingredient_overlap_ratio,
+    choose_profile,
+)
 from recipebuilder.recipe_engine import StockItem, StockRepository
 
 
@@ -258,3 +263,22 @@ def test_rum_subtypes_follow_profile():
     citrus_recipe = builder.build_recipe(citrus, profile="citrus_fresh", seed=9)
     citrus_base = next(s.ingredient.name for s in citrus_recipe.ingredients if s.role == "base")
     assert "white" in citrus_base.lower() or "light" in citrus_base.lower()
+
+
+def test_build_candidates_are_diverse():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "house_type": "beach house",
+        "base_spirit": "rum",
+        "carbonation_texture": "properly sparkling",
+    }
+
+    candidates = builder.build_candidates(responses, profile="tropical", seed=22, num_candidates=3)
+    assert len(candidates) >= 2
+
+    overlap = _ingredient_overlap_ratio(candidates[0], candidates[1])
+    assert overlap <= 0.7

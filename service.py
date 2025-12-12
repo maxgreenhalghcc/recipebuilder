@@ -1,14 +1,22 @@
 """Flask service exposing the recipe builder engine."""
 from __future__ import annotations
 
+import collections
 import json
 import logging
+from collections import deque
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Deque, Dict, FrozenSet, Hashable, Optional, Tuple
 
 from flask import Flask, Response, jsonify, request
 
-from recipebuilder import FlavourAssociationModel, StockRepository, generate_cocktail_recipe
+from recipebuilder import (
+    FlavourAssociationModel,
+    ProfileRecipeBuilder,
+    StockRepository,
+    choose_profile,
+    generate_cocktail_recipe,
+)
 from recipebuilder.recipe_engine import UnknownBarError
 
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +49,39 @@ def _load_association_model() -> Optional[FlavourAssociationModel]:
 
 
 _ASSOCIATION_MODEL = _load_association_model()
+
+_RECENT_RECIPES: Dict[Tuple[str, Hashable], Deque[Tuple[FrozenSet[str], str, str]]] = collections.defaultdict(deque)
+_RECENT_LIMIT = 10
+
+
+def _ingredient_signature(ingredients: list[str]) -> FrozenSet[str]:
+    return frozenset(ing.lower() for ing in ingredients)
+
+
+def _recipe_signature(recipe: Dict[str, Any]) -> Tuple[FrozenSet[str], str, str]:
+    body = recipe.get("body", {}) if isinstance(recipe, dict) else {}
+    ingredients = body.get("ingredients") or []
+    glass = str(body.get("glassware", "")).lower()
+    garnish = str(body.get("garnish", "")).lower()
+    return (_ingredient_signature(list(ingredients)), glass, garnish)
+
+
+def _recent_key(bar_id: str, session_id: Optional[str]) -> Tuple[str, Hashable]:
+    return (bar_id, session_id or "anon")
+
+
+def _remember_recipe(bar_id: str, session_id: Optional[str], recipe: Dict[str, Any]) -> None:
+    sig = _recipe_signature(recipe)
+    bucket = _RECENT_RECIPES[_recent_key(bar_id, session_id)]
+    bucket.append(sig)
+    if len(bucket) > _RECENT_LIMIT:
+        bucket.popleft()
+
+
+def _is_recent_duplicate(bar_id: str, session_id: Optional[str], recipe: Dict[str, Any]) -> bool:
+    sig = _recipe_signature(recipe)
+    bucket = _RECENT_RECIPES.get(_recent_key(bar_id, session_id))
+    return bucket is not None and sig in bucket
 
 
 @app.get("/health")
@@ -150,20 +191,60 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
 
     try:
-        recipe = generate_cocktail_recipe(
-            responses,
-            bar_id=bar_id,
-            repository=_REPOSITORY,
-            association_model=_ASSOCIATION_MODEL,
-        )
+        _REPOSITORY.prime_cache(bar_id)
     except UnknownBarError as exc:
         return _json_error(str(exc), 404)
+
+    responses_with_bar = dict(responses)
+    responses_with_bar["bar_id"] = bar_id
+    profile = choose_profile(responses_with_bar)
+    builder = ProfileRecipeBuilder(_REPOSITORY)
+
+    seed_value: Optional[int] = None
+    if responses_with_bar.get("seed") is not None:
+        try:
+            seed_value = int(str(responses_with_bar.get("seed")))
+        except (TypeError, ValueError):
+            seed_value = None
+
+    try:
+        candidate_recipes = builder.build_candidates(
+            responses_with_bar,
+            profile,
+            seed=seed_value,
+            num_candidates=3,
+        )
     except ValueError as exc:
         return _json_error(str(exc), 400)
 
-    ingredients_list = _format_ingredient_list(recipe)
+    if not candidate_recipes:
+        return _json_error("Unable to generate a recipe with the provided stock.", 400)
+
+    rendered_candidates = []
+    for cand in candidate_recipes:
+        ingredients_list = _format_ingredient_list(cand)
+        signature_recipe = {
+            "body": {
+                "ingredients": ingredients_list,
+                "glassware": cand.glassware,
+                "garnish": cand.garnish or "",
+            }
+        }
+        rendered_candidates.append((cand, ingredients_list, signature_recipe))
+
+    chosen_tuple = next(
+        (
+            candidate
+            for candidate in rendered_candidates
+            if not _is_recent_duplicate(bar_id, session_id, candidate[2])
+        ),
+        rendered_candidates[0],
+    )
+
+    recipe, ingredients_list, signature_recipe = chosen_tuple
     method_text = _build_method_text(recipe)
     warnings = _collect_warnings(recipe)
+    _remember_recipe(bar_id, session_id, signature_recipe)
 
     response_payload = {
         "data": {

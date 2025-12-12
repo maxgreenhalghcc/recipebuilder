@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from recipebuilder.recipe_engine import (
     CocktailRecipe,
@@ -39,6 +39,21 @@ PROFILE_FLAVOUR_WORDS: Dict[str, List[str]] = {
     "candy_fun": ["blue", "raspberry", "strawberry", "cherry", "berry"],
     "dessert": ["vanilla", "caramel", "toffee", "passion", "pineapple"],
 }
+
+
+MAX_SHARED_INGREDIENT_RATIO = 0.7
+
+
+def _ingredient_key_set(recipe: CocktailRecipe) -> Set[str]:
+    return {s.ingredient.name.lower() for s in recipe.ingredients}
+
+
+def _ingredient_overlap_ratio(a: CocktailRecipe, b: CocktailRecipe) -> float:
+    a_keys = _ingredient_key_set(a)
+    b_keys = _ingredient_key_set(b)
+    if not a_keys and not b_keys:
+        return 0.0
+    return len(a_keys & b_keys) / len(a_keys | b_keys)
 
 
 def choose_profile(responses: Dict[str, Any]) -> str:
@@ -237,69 +252,46 @@ class ProfileRecipeBuilder:
         self.glass_logic = glass_logic
 
     def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe:
-        bar_key = (responses.get("bar_id") or "").strip().lower()
-        seeds: List[int] = []
-        base_seed = seed if seed is not None else random.getrandbits(32)
-        seeds.append(base_seed)
-        rnd_for_variants = random.Random(base_seed)
-        while len(seeds) < 3:
-            seeds.append(rnd_for_variants.getrandbits(32))
+        rnd = random.Random(seed if seed is not None else random.getrandbits(32))
+        self._load_items(responses)
+        return self._build_single_recipe(responses, profile, rnd)
 
+    def build_candidates(
+        self,
+        responses: Dict[str, Any],
+        profile: str,
+        seed: int | None = None,
+        num_candidates: int = 3,
+        max_attempts: int = 10,
+    ) -> List[CocktailRecipe]:
+        base_seed = seed if seed is not None else random.getrandbits(32)
+        rnd = random.Random(base_seed)
+        self._load_items(responses)
+        candidates: List[CocktailRecipe] = []
+        attempts = 0
+
+        while len(candidates) < num_candidates and attempts < max_attempts:
+            attempts += 1
+            recipe_seed = rnd.getrandbits(32)
+            candidate = self._build_single_recipe(responses, profile, random.Random(recipe_seed))
+            if all(_ingredient_overlap_ratio(candidate, existing) <= MAX_SHARED_INGREDIENT_RATIO for existing in candidates):
+                candidates.append(candidate)
+
+        return candidates
+
+    def _load_items(self, responses: Dict[str, Any]) -> List[StockItem]:
         stock = (
             self.repository.prime_cache(responses.get("bar_id", ""))
             if hasattr(self.repository, "prime_cache")
             else self.repository.load_bar_stock(responses.get("bar_id", ""))
         )
-        all_items = [item for item in getattr(self.repository, "_all_items", stock) if not is_creamy(item)]
+        return [item for item in getattr(self.repository, "_all_items", stock) if not is_creamy(item)]
 
-        candidates: List[CocktailRecipe] = []
-        for variant_seed in seeds:
-            rnd = random.Random(variant_seed)
-            candidates.append(self._build_single(responses, profile, rnd, all_items))
-
-        chosen = self._pick_diverse_candidate(bar_key, candidates)
-        return chosen
-
-    _recent_recipes: Dict[str, List[frozenset[str]]] = {}
-
-    def _pick_diverse_candidate(self, bar_key: str, candidates: Sequence[CocktailRecipe]) -> CocktailRecipe:
-        recent = self._recent_recipes.setdefault(bar_key, [])
-
-        def signature(recipe: CocktailRecipe) -> frozenset[str]:
-            names = [s.ingredient.name.lower() for s in recipe.ingredients if s.role != "mixer"]
-            return frozenset(names)
-
-        def diversity_score(sig: frozenset[str]) -> float:
-            if not recent:
-                return 1.0
-            overlap_scores = []
-            for past in recent:
-                if not past:
-                    continue
-                overlap = len(sig & past) / max(1, len(sig | past))
-                overlap_scores.append(1.0 - overlap)
-            return min(overlap_scores) if overlap_scores else 1.0
-
-        best: tuple[float, CocktailRecipe] | None = None
-        for recipe in candidates:
-            sig = signature(recipe)
-            score = diversity_score(sig)
-            if best is None or score > best[0]:
-                best = (score, recipe)
-
-        chosen = best[1] if best else candidates[0]
-        chosen_sig = signature(chosen)
-        recent.append(chosen_sig)
-        if len(recent) > 5:
-            recent.pop(0)
-        return chosen
-
-    def _build_single(
+    def _build_single_recipe(
         self,
         responses: Dict[str, Any],
         profile: str,
         rnd: random.Random,
-        all_items: Sequence[StockItem],
     ) -> CocktailRecipe:
         abv_lane = (responses.get("abv_lane") or "medium").strip().lower()
         base_target = {"strong": 60.0, "medium": 50.0, "low": 40.0}.get(abv_lane, 50.0)

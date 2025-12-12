@@ -41,10 +41,11 @@ def client():
 def test_generate_returns_structured_payload(monkeypatch, client):
     dummy_recipe = _build_dummy_recipe()
 
-    def fake_generate(responses, bar_id, repository, association_model):  # noqa: D401
-        return dummy_recipe
+    def fake_build_candidates(self, responses, profile, seed=None, num_candidates=3, max_attempts=10):
+        return [dummy_recipe]
 
-    monkeypatch.setattr(service, "generate_cocktail_recipe", fake_generate)
+    monkeypatch.setattr(service.ProfileRecipeBuilder, "build_candidates", fake_build_candidates)
+    monkeypatch.setattr(service, "choose_profile", lambda responses: "tropical")
 
     payload = {
         "bar_id": "cross_axes",
@@ -81,11 +82,12 @@ def test_generate_uses_session_identifiers(monkeypatch, client):
     dummy_recipe = _build_dummy_recipe()
     captured = {}
 
-    def fake_generate(responses, bar_id, repository, association_model):
-        captured["bar_id"] = bar_id
-        return dummy_recipe
+    def fake_build_candidates(self, responses, profile, seed=None, num_candidates=3, max_attempts=10):
+        captured["bar_id"] = responses.get("bar_id")
+        return [dummy_recipe]
 
-    monkeypatch.setattr(service, "generate_cocktail_recipe", fake_generate)
+    monkeypatch.setattr(service.ProfileRecipeBuilder, "build_candidates", fake_build_candidates)
+    monkeypatch.setattr(service, "choose_profile", lambda responses: "tropical")
 
     payload = {
         "session": {"barId": "enchanted", "id": "session-123"},
@@ -101,3 +103,18 @@ def test_generate_uses_session_identifiers(monkeypatch, client):
     assert captured["bar_id"] == "enchanted"
     assert data["data"]["barId"] == "enchanted"
     assert data["data"]["sessionId"] == "session-123"
+
+
+def test_recent_recipe_cache_tracks_duplicates():
+    service._RECENT_RECIPES.clear()
+    recipe_dict = {
+        "body": {
+            "ingredients": ["50ml Vodka", "Top with lemonade (mixer)"],
+            "glassware": "long glass",
+            "garnish": "lemon twist",
+        }
+    }
+
+    assert not service._is_recent_duplicate("demo-bar", "session-x", recipe_dict)
+    service._remember_recipe("demo-bar", "session-x", recipe_dict)
+    assert service._is_recent_duplicate("demo-bar", "session-x", recipe_dict)
