@@ -344,18 +344,6 @@
       "default_measure_ml": 15
     },
     {
-      "name": "Chocolate Syrup",
-      "category": "syrup",
-      "role": "sweetener",
-      "flavour_tags": ["indulgent", "rich"],
-      "profiles": ["dessert"],
-      "avoid_profiles": ["citrus_fresh"],
-      "aromas": ["sweet", "earthy"],
-      "seasons": ["winter"],
-      "spirits": ["vodka", "rum"],
-      "default_measure_ml": 15
-    },
-    {
       "name": "Banana Syrup",
       "category": "syrup",
       "role": "sweetener",
