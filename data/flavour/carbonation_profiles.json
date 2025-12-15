@@ -1,0 +1,44 @@
+{
+  "still & silky": {
+    "tags": ["still", "silky", "elegant"],
+    "template_bias": {"tpl_martini_style": 1.35, "tpl_shaken_sour": 1.2, "tpl_collins": 0.9, "tpl_highball": 0.8},
+    "lengthener_rules": {"allow_carbonated": false, "require_carbonated": false},
+    "juice_strategy": {
+      "style": "juice_only",
+      "max_unique": 2,
+      "lengthener_preference": "juice_only"
+    },
+    "candidate_bias": {
+      "families": {"egg_white": 1.1, "aquafaba": 1.1, "dry_vermouth": 1.1}
+    },
+    "explain": "Texture still & silky → prioritize Martini/Sour; avoid carbonated lengtheners; foam allowed if chosen."
+  },
+  "lightly fizzy": {
+    "tags": ["light-fizz", "refreshing"],
+    "template_bias": {"tpl_collins": 1.25, "tpl_highball": 1.15, "tpl_shaken_sour": 0.95, "tpl_martini_style": 0.85},
+    "lengthener_rules": {"allow_carbonated": true, "preferred": ["lemonade", "soda water", "tonic water"]},
+    "juice_strategy": {
+      "style": "lemonade_combo",
+      "max_unique": 2,
+      "lengthener_preference": "lemonade_combo",
+      "preferred_lengtheners": ["lemonade"]
+    },
+    "candidate_bias": {"items": {"lemonade": 1.3, "soda water": 1.25, "tonic water": 1.15}},
+    "ratio_nudge": {"juice": [0.01, 0.03], "sweetener": [0.0, 0.01]},
+    "explain": "Texture lightly fizzy → Collins/Highball bias; carbonated lengtheners preferred."
+  },
+  "properly sparkling": {
+    "tags": ["sparkling", "crisp"],
+    "template_bias": {"tpl_highball": 1.4, "tpl_collins": 1.2, "tpl_shaken_sour": 0.8, "tpl_martini_style": 0.6},
+    "lengthener_rules": {"allow_carbonated": true, "require_carbonated": true, "preferred": ["soda water", "lemonade", "tonic water"]},
+    "juice_strategy": {
+      "style": "sparkling_lengthener",
+      "max_unique": 3,
+      "lengthener_preference": "sparkling_core",
+      "preferred_lengtheners": ["soda water", "lemonade", "tonic water"]
+    },
+    "candidate_bias": {"items": {"soda water": 1.35, "lemonade": 1.2, "tonic water": 1.2}},
+    "ratio_nudge": {"juice": [0.03, 0.06], "sweetener": [-0.01, 0.01]},
+    "explain": "Texture sparkling → require fizz; push Highball/Collins; lengthen with soda/lemonade/tonic."
+  }
+}

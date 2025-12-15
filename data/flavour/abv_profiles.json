@@ -1,0 +1,25 @@
+{
+  "low": {
+    "tags": ["low-abv", "sessionable"],
+    "abv_range": [6, 12],
+    "role_bounds": {"base_max": 0.38, "juice_min": 0.28},
+    "template_bias": {"tpl_highball": 1.35, "tpl_collins": 1.25, "tpl_shaken_sour": 0.9, "tpl_martini_style": 0.7},
+    "ratio_nudge": {"juice": [0.02, 0.05], "base": [-0.03, -0.01]},
+    "explain": "ABV low → keep 6–12% target; more length; rein in base."
+  },
+  "medium": {
+    "tags": ["mid-abv"],
+    "abv_range": [12, 20],
+    "role_bounds": {"base_max": 0.5},
+    "template_bias": {"tpl_collins": 1.15, "tpl_shaken_sour": 1.15, "tpl_highball": 1.0, "tpl_martini_style": 0.95},
+    "explain": "ABV medium → standard strength; broad template access."
+  },
+  "strong": {
+    "tags": ["high-abv", "spirit-forward"],
+    "abv_range": [20, 28],
+    "role_bounds": {"base_min": 0.5, "juice_max": 0.25},
+    "template_bias": {"tpl_martini_style": 1.4, "tpl_shaken_sour": 1.2, "tpl_collins": 0.85, "tpl_highball": 0.7},
+    "ratio_nudge": {"base": [0.02, 0.05], "sweetener": [0.0, 0.02], "juice": [-0.03, -0.01]},
+    "explain": "ABV strong → prioritize spirit-forward builds; tighten juice."
+  }
+}
