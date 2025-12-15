@@ -17,7 +17,7 @@ from recipebuilder.recipe_engine import (
     extract_flavour_keywords,
     extract_spirit_family,
 )
-from recipebuilder.preferences import _tokenise_values
+from recipebuilder.preferences import _NON_RESPONSE_TOKENS, _tokenise_values
 
 
 @dataclass
@@ -307,11 +307,7 @@ class ProfileRecipeBuilder:
         raw_items = getattr(self.repository, "_all_items", stock)
 
         tokenised_allergens = _tokenise_values(responses.get("allergens"))
-        filtered_tokens = {
-            token
-            for token in tokenised_allergens
-            if token not in {"none", "no", "n/a", "na", "nil", "null"}
-        }
+        filtered_tokens = {token for token in tokenised_allergens if token not in _NON_RESPONSE_TOKENS}
         avoid_terms = set(_expand_avoid_terms(filtered_tokens))
 
         notes = responses.get("notes") or ""

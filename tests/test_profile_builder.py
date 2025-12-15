@@ -12,6 +12,7 @@ from recipebuilder.profile_builder import (
     choose_profile,
 )
 from recipebuilder.recipe_engine import StockItem, StockRepository
+from recipebuilder.preferences import _tokenise_values
 
 
 class _MiniRepository:
@@ -303,3 +304,8 @@ def test_allergen_strings_filter_stock():
 
     lowered = [s.ingredient.name.lower() for s in recipe.ingredients]
     assert not any("coconut" in name or "malibu" in name for name in lowered)
+
+
+def test_allergen_none_values_are_ignored():
+    tokens = _tokenise_values("none, no, NA, n/a, nope, nah, 0")
+    assert tokens == set()

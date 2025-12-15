@@ -128,6 +128,21 @@ _ALLERGEN_RULES: Sequence[Mapping[str, object]] = (
 )
 
 
+_NON_RESPONSE_TOKENS: Set[str] = {
+    "none",
+    "no",
+    "n/a",
+    "na",
+    "nah",
+    "nope",
+    "nil",
+    "null",
+    "0",
+    "n.a",
+    "n.a.",
+}
+
+
 def _tokenise_values(value: object) -> Set[str]:
     tokens: Set[str] = set()
     if value is None:
@@ -141,8 +156,9 @@ def _tokenise_values(value: object) -> Set[str]:
         parts = [str(value).strip()]
     for part in parts:
         normalized = _normalize(part)
-        if normalized:
-            tokens.add(normalized)
+        if not normalized or normalized in _NON_RESPONSE_TOKENS:
+            continue
+        tokens.add(normalized)
     return tokens
 
 
