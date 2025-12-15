@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -10,9 +11,13 @@ from recipebuilder.recipe_engine import (
     CocktailRecipe,
     IngredientSuggestion,
     StockItem,
+    _expand_avoid_terms,
+    _extract_avoid_terms,
+    _normalize,
     extract_flavour_keywords,
     extract_spirit_family,
 )
+from recipebuilder.preferences import _tokenise_values
 
 
 @dataclass
@@ -244,6 +249,20 @@ def _is_core_juice(item: StockItem) -> bool:
     return "juice" in name or item.category == "juice"
 
 
+def _should_exclude_stock(item: StockItem, avoid_terms: Set[str]) -> bool:
+    if not avoid_terms:
+        return False
+    name = item.name.lower()
+    tags = {str(tag).lower() for tag in getattr(item, "flavour_tags", [])}
+    for term in avoid_terms:
+        key = _normalize(term)
+        if not key:
+            continue
+        if key in name or any(key in tag for tag in tags):
+            return True
+    return False
+
+
 class ProfileRecipeBuilder:
     """Build cocktails using profile-guarded stock items."""
 
@@ -285,7 +304,39 @@ class ProfileRecipeBuilder:
             if hasattr(self.repository, "prime_cache")
             else self.repository.load_bar_stock(responses.get("bar_id", ""))
         )
-        return [item for item in getattr(self.repository, "_all_items", stock) if not is_creamy(item)]
+        raw_items = getattr(self.repository, "_all_items", stock)
+
+        tokenised_allergens = _tokenise_values(responses.get("allergens"))
+        filtered_tokens = {
+            token
+            for token in tokenised_allergens
+            if token not in {"none", "no", "n/a", "na", "nil", "null"}
+        }
+        avoid_terms = set(_expand_avoid_terms(filtered_tokens))
+
+        notes = responses.get("notes") or ""
+        if isinstance(notes, str) and notes.strip():
+            avoid_terms.update(_extract_avoid_terms(notes))
+
+        filtered_items = [
+            item
+            for item in raw_items
+            if not is_creamy(item) and not _should_exclude_stock(item, avoid_terms)
+        ]
+
+        cache: Dict[str, List[StockItem]] = defaultdict(list)
+        for item in filtered_items:
+            if not item.profiles and not item.neutral:
+                continue
+            for prof in item.profiles or {"neutral"}:
+                cache[prof].append(item)
+            if item.neutral:
+                cache.setdefault("neutral", []).append(item)
+
+        self.repository._all_items_cache = filtered_items  # type: ignore[attr-defined]
+        self.repository._profile_cache = cache  # type: ignore[attr-defined]
+
+        return filtered_items
 
     def _build_single_recipe(
         self,

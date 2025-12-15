@@ -151,23 +151,11 @@ def _collect_warnings(recipe) -> list[str]:
 def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[str]]:
     """Determine the bar ID and session ID from the request payload."""
 
-    session_raw = payload.get("session")
-    session_info = session_raw if isinstance(session_raw, dict) else None
+    session_info = payload.get("session") if isinstance(payload.get("session"), dict) else None
 
-    # Accept bar, bar_id, barId at root or inside session
-    bar_id_value = (
-        payload.get("bar")
-        or payload.get("bar_id")
-        or payload.get("barId")
-    )
-
+    bar_id_value = payload.get("bar_id") or payload.get("barId")
     if session_info:
-        bar_id_value = (
-            session_info.get("bar")
-            or session_info.get("bar_id")
-            or session_info.get("barId")
-            or bar_id_value
-        )
+        bar_id_value = session_info.get("barId") or session_info.get("bar_id") or bar_id_value
 
     if bar_id_value is None:
         bar_id = "demo-bar"
@@ -185,7 +173,6 @@ def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[
     return bar_id, session_id
 
 
-
 def _json_error(message: str, status_code: int) -> Response:
     """Return a JSON error payload."""
 
@@ -200,7 +187,7 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
 
     bar_id, session_id = _extract_bar_and_session(payload)
     logger.info("Received generation request for bar=%s session=%s", bar_id, session_id)
-    reserved_keys = {"bar","bar_id", "barId", "session", "session_id", "sessionId"}
+    reserved_keys = {"bar_id", "barId", "session", "session_id", "sessionId"}
     responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
 
     try:

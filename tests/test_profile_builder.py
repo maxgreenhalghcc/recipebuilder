@@ -282,3 +282,24 @@ def test_build_candidates_are_diverse():
 
     overlap = _ingredient_overlap_ratio(candidates[0], candidates[1])
     assert overlap <= 0.7
+
+
+def test_allergen_strings_filter_stock():
+    repo = StockRepository()
+    repo.prime_cache("cross_axes")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "cross_axes",
+        "house_type": "beach house",
+        "base_spirit": "rum",
+        "season": "summer",
+        "sweetener_question": "classic",
+        "carbonation_texture": "properly sparkling",
+        "allergens": "coconut, nuts",
+    }
+
+    recipe = builder.build_recipe(responses, profile="tropical", seed=7)
+
+    lowered = [s.ingredient.name.lower() for s in recipe.ingredients]
+    assert not any("coconut" in name or "malibu" in name for name in lowered)
