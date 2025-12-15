@@ -1,0 +1,37 @@
+{
+  "nevermore": {
+    "flavour_matrix": [
+      { "type": "spirit", "name": "normal gin", "seasons": ["spring"], "aromas": ["floral", "citrus"], "profiles": ["botanical", "fresh", "floral"] },
+      { "type": "spirit", "name": "pink gin", "seasons": ["spring"], "aromas": ["floral"], "profiles": ["fruity", "romantic"] },
+      { "type": "spirit", "name": "passion fruit gin", "seasons": ["summer", "winter"], "aromas": ["sweet"], "profiles": ["tropical", "exotic"] },
+      { "type": "spirit", "name": "lemon gin", "seasons": ["summer"], "aromas": ["citrus"], "profiles": ["zesty", "fresh"] },
+      { "type": "spirit", "name": "amaretto", "seasons": ["autumn"], "aromas": ["woody"], "profiles": ["nutty", "rich"] },
+      { "type": "spirit", "name": "white rum", "seasons": ["summer"], "aromas": ["sweet"], "profiles": ["light", "tropical"] },
+      { "type": "spirit", "name": "dark rum", "seasons": ["autumn", "winter"], "aromas": ["woody"], "profiles": ["rich", "indulgent"] },
+      { "type": "spirit", "name": "spiced rum", "seasons": ["autumn"], "aromas": ["woody"], "profiles": ["spiced", "warm"] },
+      { "type": "spirit", "name": "tequila", "seasons": ["summer"], "aromas": ["citrus"], "profiles": ["zesty", "dry"] },
+      { "type": "spirit", "name": "vodka", "seasons": ["spring", "summer"], "aromas": ["citrus", "sweet"], "profiles": ["clean", "zesty", "vibrant"] },
+      { "type": "spirit", "name": "malibu", "seasons": ["summer"], "aromas": ["sweet"], "profiles": ["tropical", "coconut"] },
+      { "type": "spirit", "name": "passoa", "seasons": ["summer", "winter"], "aromas": ["sweet"], "profiles": ["tropical", "exotic"] },
+      { "type": "spirit", "name": "peach schnapps", "seasons": ["spring", "summer"], "aromas": ["fruity"], "profiles": ["sweet", "fresh"] },
+      { "type": "syrup", "name": "grenadine", "seasons": ["spring", "summer"], "aromas": ["sweet"], "profiles": ["candy", "classic"] },
+      { "type": "syrup", "name": "elderflower syrup", "seasons": ["spring"], "aromas": ["floral"], "profiles": ["fresh", "delicate"] },
+      { "type": "syrup", "name": "vanilla syrup", "seasons": ["winter"], "aromas": ["sweet"], "profiles": ["rich", "classic"] },
+      { "type": "syrup", "name": "simple syrup", "seasons": ["all"], "aromas": ["sweet"], "profiles": ["neutral", "classic"] },
+      { "type": "syrup", "name": "caramel syrup", "seasons": ["autumn", "winter"], "aromas": ["sweet"], "profiles": ["rich", "indulgent"] },
+      { "type": "syrup", "name": "maple syrup", "seasons": ["autumn"], "aromas": ["woody", "sweet"], "profiles": ["nutty", "warming"] },
+      { "type": "juice", "name": "orange juice", "seasons": ["spring"], "aromas": ["citrus"], "profiles": ["zesty", "fresh"] },
+      { "type": "juice", "name": "pineapple juice", "seasons": ["summer"], "aromas": ["sweet"], "profiles": ["tropical", "vibrant"] },
+      { "type": "juice", "name": "cranberry juice", "seasons": ["autumn"], "aromas": ["woody"], "profiles": ["dry", "subtle"] },
+      { "type": "juice", "name": "passion fruit juice", "seasons": ["winter"], "aromas": ["sweet"], "profiles": ["exotic", "indulgent"] },
+      { "type": "garnish", "name": "mint", "seasons": ["spring", "summer"], "aromas": ["floral"], "profiles": ["fresh", "cooling"] },
+      { "type": "garnish", "name": "lemon", "seasons": ["summer"], "aromas": ["citrus"], "profiles": ["zesty", "clean"] },
+      { "type": "garnish", "name": "passion fruit", "seasons": ["summer", "winter"], "aromas": ["sweet"], "profiles": ["exotic", "tropical"] },
+      { "type": "garnish", "name": "pineapple", "seasons": ["summer"], "aromas": ["sweet"], "profiles": ["tropical", "juicy"] },
+      { "type": "garnish", "name": "orange", "seasons": ["spring", "summer"], "aromas": ["citrus"], "profiles": ["zesty", "classic"] },
+      { "type": "garnish", "name": "raspberries", "seasons": ["spring"], "aromas": ["sweet"], "profiles": ["fruity", "vibrant"] },
+      { "type": "modifier", "name": "bitters", "seasons": ["autumn", "winter"], "aromas": ["woody"], "profiles": ["dry", "herbal"] },
+      { "type": "modifier", "name": "lime juice", "seasons": ["summer"], "aromas": ["citrus"], "profiles": ["zesty", "sharp"] }
+    ]
+  }
+}
