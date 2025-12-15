@@ -120,6 +120,99 @@ def test_sweet_profiles_keep_sour_in_range():
     assert 15.0 <= sour.amount_ml <= 25.0
 
 
+def _citrus_amount(suggestions):
+    citrus_tokens = {"orange", "cranberry", "lemon", "lime", "grapefruit"}
+    total = 0.0
+    for suggestion in suggestions:
+        if suggestion.role not in {"juice", "sour"}:
+            continue
+        name = suggestion.ingredient.name.lower()
+        if any(tok in name for tok in citrus_tokens):
+            total += suggestion.amount_ml or 0.0
+    return total
+
+
+def _sweet_load(suggestions):
+    sweet_tokens = ("syrup", "sweet", "vanilla", "caramel", "grenadine", "honey", "passion")
+    return sum(
+        (suggestion.amount_ml or 0.0)
+        for suggestion in suggestions
+        if suggestion.role in {"sweetener", "modifier"}
+        and any(tok in suggestion.ingredient.name.lower() for tok in sweet_tokens)
+    )
+
+
+def _thick_amount(suggestions):
+    thick_tokens = ("passion", "mango", "puree")
+    return sum(
+        (s.amount_ml or 0.0)
+        for s in suggestions
+        if s.role == "juice" and any(tok in s.ingredient.name.lower() for tok in thick_tokens)
+    )
+
+
+def test_dessert_payload_limits_citrus_and_adds_fizz():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "base_spirit": "vodka",
+        "season": "autumn",
+        "house_type": "modern house",
+        "dining_style": "a sweet tooth indulging in rich flavours",
+        "music_preference": "pop",
+        "aroma_preference": "woody",
+        "bitterness_tolerance": "medium",
+        "sweetener_question": "floral",
+        "carbonation_texture": "lightly fizzy",
+        "abv_lane": "medium",
+        "allergens": "none",
+    }
+
+    profile = choose_profile(responses)
+    assert profile in {"dessert", "candy_fun"}
+
+    recipe = builder.build_recipe(responses, profile=profile, seed=595512594)
+    citrus_ml = _citrus_amount(recipe.ingredients)
+    assert citrus_ml <= 45.0
+    mixer = next((s for s in recipe.ingredients if s.role == "mixer"), None)
+    assert mixer is not None
+    assert any(token in mixer.ingredient.name.lower() for token in ("lemonade", "soda", "tonic"))
+
+
+def test_sparkling_payload_uses_fizz_and_avoids_claggy_mix():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "base_spirit": "vodka",
+        "season": "summer",
+        "house_type": "beach house",
+        "dining_style": "refreshing and vibrant flavours which awaken my senses",
+        "music_preference": "jazz/blues",
+        "aroma_preference": "citrus",
+        "bitterness_tolerance": "high",
+        "sweetener_question": "classic",
+        "carbonation_texture": "properly sparkling",
+        "abv_lane": "strong",
+        "allergens": "none",
+    }
+
+    profile = choose_profile(responses)
+    recipe = builder.build_recipe(responses, profile=profile, seed=1025268697)
+
+    mixer = next((s for s in recipe.ingredients if s.role == "mixer"), None)
+    assert mixer is not None
+    assert any(token in mixer.ingredient.name.lower() for token in ("lemonade", "soda", "tonic"))
+
+    sweet_plus_thick = _sweet_load(recipe.ingredients) + _thick_amount(recipe.ingredients)
+    assert sweet_plus_thick <= 55.0
+
+
 def test_choose_profile_mapping_cases():
     assert choose_profile({"profile": "berry"}) == "berry"
 
@@ -309,3 +402,30 @@ def test_allergen_strings_filter_stock():
 def test_allergen_none_values_are_ignored():
     tokens = _tokenise_values("none, no, NA, n/a, nope, nah, 0")
     assert tokens == set()
+
+
+def test_relaxed_base_allows_recipe_when_profiles_conflict():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "base_spirit": "gin",
+        "season": "winter",
+        "house_type": "modern house",
+        "dining_style": "a balanced blend of flavours",
+        "music_preference": "jazz/blues",
+        "aroma_preference": "woody",
+        "bitterness_tolerance": "medium",
+        "sweetener_question": "classic",
+        "carbonation_texture": "properly sparkling",
+        "foam_toggle": "yes",
+        "abv_lane": "strong",
+        "allergens": "none",
+    }
+
+    recipe = builder.build_recipe(responses, profile="classic_boozy", seed=2446613597)
+
+    base_names = [s.ingredient.name.lower() for s in recipe.ingredients if s.role == "base"]
+    assert any("gin" in name for name in base_names)
