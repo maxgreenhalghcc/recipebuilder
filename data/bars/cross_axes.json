@@ -857,6 +857,56 @@
       "role": "garnish",
       "neutral": false,
       "default_measure_ml": 0.0
+    },
+    {
+      "name": "Lemonade",
+      "category": "mixer",
+      "flavour_tags": [
+        "zesty"
+      ],
+      "profiles": [
+        "tropical",
+        "citrus_fresh",
+        "berry",
+        "candy_fun",
+        "dessert",
+        "classic_boozy"
+      ],
+      "aromas": [
+        "citrus"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "role": "mixer",
+      "neutral": true,
+      "default_measure_ml": 100
+    },
+    {
+      "name": "Soda Water",
+      "category": "mixer",
+      "flavour_tags": [
+        "clean"
+      ],
+      "profiles": [
+        "tropical",
+        "citrus_fresh",
+        "berry",
+        "candy_fun",
+        "dessert",
+        "classic_boozy"
+      ],
+      "aromas": [
+        "fresh"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "role": "mixer",
+      "neutral": true,
+      "default_measure_ml": 100
     }
   ]
 }

@@ -49,6 +49,31 @@ PROFILE_FLAVOUR_WORDS: Dict[str, List[str]] = {
 MAX_SHARED_INGREDIENT_RATIO = 0.7
 
 
+def _is_sour(item: StockItem) -> bool:
+    name = item.name.lower()
+    return item.role == "sour" or "lemon" in name or "lime" in name
+
+
+def _is_mixer(item: StockItem) -> bool:
+    name = item.name.lower()
+    mixer_tokens = ("lemonade", "soda", "tonic", "ginger", "fizz", "sparkling")
+    return item.role == "mixer" or any(token in name for token in mixer_tokens)
+
+
+def _is_core_juice(item: StockItem) -> bool:
+    return item.role == "juice" and not _is_sour(item) and not _is_mixer(item)
+
+
+def _is_citrus_juice(item: StockItem) -> bool:
+    name = item.name.lower()
+    return any(token in name for token in ("orange", "cranberry", "lemon", "lime", "grapefruit"))
+
+
+def _is_thick_juice(item: StockItem) -> bool:
+    name = item.name.lower()
+    return any(token in name for token in ("passion", "mango", "puree", "banana", "guava"))
+
+
 def _ingredient_key_set(recipe: CocktailRecipe) -> Set[str]:
     return {s.ingredient.name.lower() for s in recipe.ingredients}
 
@@ -98,13 +123,15 @@ def choose_profile(responses: Dict[str, Any]) -> str:
     if "balanced blend" in dining:
         scores["citrus_fresh"] += 2
         scores["berry"] += 2
+        scores["dessert"] -= 1
     if "subtle" in dining or "fresh" in dining:
         scores["citrus_fresh"] += 3
+        scores["dessert"] -= 1
     if "refreshing" in dining or "vibrant" in dining or "bright" in dining or "zesty" in dining:
         scores["tropical"] += 3
         scores["citrus_fresh"] += 2
     if "sweet tooth" in dining or "dessert" in dining or "indulging in rich flavours" in dining:
-        scores["dessert"] += 3
+        scores["dessert"] += 6
         scores["candy_fun"] += 2
 
     music = (responses.get("music_preference") or "").lower()
@@ -129,9 +156,9 @@ def choose_profile(responses: Dict[str, Any]) -> str:
     if "floral" in aroma:
         scores["berry"] += 3
         scores["citrus_fresh"] += 1
-    if "sweet sugar" in aroma:
+    if "sweet" in aroma:
         scores["candy_fun"] += 2
-        scores["dessert"] += 1
+        scores["dessert"] += 2
 
     base = (responses.get("base_spirit") or "").lower()
     if "rum" in base:
@@ -159,6 +186,7 @@ def choose_profile(responses: Dict[str, Any]) -> str:
         scores["berry"] += 1
     if "high" in bitter:
         scores["classic_boozy"] += 3
+        scores["citrus_fresh"] += 1
 
     sweet_style = (responses.get("sweetener_question") or "").lower()
     if "classic" in sweet_style:
@@ -166,8 +194,9 @@ def choose_profile(responses: Dict[str, Any]) -> str:
         scores["citrus_fresh"] += 1
     if "floral" in sweet_style:
         scores["berry"] += 3
-    if "rich" in sweet_style:
         scores["dessert"] += 3
+    if "rich" in sweet_style:
+        scores["dessert"] += 4
         scores["candy_fun"] += 2
     if "zesty" in sweet_style:
         scores["citrus_fresh"] += 3
@@ -190,6 +219,7 @@ def choose_profile(responses: Dict[str, Any]) -> str:
         scores["tropical"] += 2
         scores["citrus_fresh"] += 2
         scores["candy_fun"] += 2
+        scores["classic_boozy"] -= 1
     if "still" in carbonation:
         scores["classic_boozy"] += 2
         scores["dessert"] += 1
@@ -429,18 +459,34 @@ class ProfileRecipeBuilder:
             juices, juice_amounts, sour_ml, glass, prefs["juice_ml"]
         )
 
+        juices, juice_amounts, sour_ml = self._apply_citrus_rules(
+            profile, juices, juice_amounts, sour_ml, responses
+        )
+
+        juice_amounts = self._apply_thickness_guard(carbonation, juices, juice_amounts, sweetness_load)
+
         spirit_extra = flavoured_ml if flavoured_spirit and flavoured_spirit.category == "spirit" else 0.0
         core_volume = base_ml + modifier_ml + sweet_ml + sour_ml + sum(juice_amounts) + spirit_extra
         mixer_item: Optional[StockItem] = None
         mixer_ml = 0.0
         if glass.sparkling:
             mixer_item = self._select_mixer(profile_items("mixer"), prefs["mixer_keywords"], carbonation)
-            mixer_ml = max(0.0, glass.capacity_ml - core_volume)
+            space = max(0.0, glass.capacity_ml - core_volume)
+            target_min = 80.0 if carbonation.startswith("properly") else 40.0
+            mixer_ml = min(max(space, target_min), max(space, glass.capacity_ml - core_volume + target_min)) if mixer_item else 0.0
         elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
             mixer_item = self._select_mixer(profile_items("mixer"), prefs["mixer_keywords"], carbonation)
             mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume)) if mixer_item else 0.0
 
-        if mixer_item is None and glass.sparkling:
+        if carbonation.startswith("properly") and (mixer_item is None or not _is_mixer(mixer_item)):
+            fallback_mixers = self.repository.neutral_items(role="mixer") + profile_items("mixer")
+            mixer_item = self._select_mixer(fallback_mixers, prefs["mixer_keywords"], carbonation)
+            if mixer_item:
+                space = max(0.0, glass.capacity_ml - core_volume)
+                target_min = 80.0
+                mixer_ml = max(target_min, space)
+
+        if mixer_item is None and glass.sparkling and not carbonation.startswith("properly"):
             mixer_item = _pick_first_matching(profile_items("juice"), prefs["juice_keywords"]) if juices else None
             if mixer_item:
                 mixer_ml = max(25.0, glass.capacity_ml - core_volume)
@@ -793,6 +839,92 @@ class ProfileRecipeBuilder:
 
         return juice_list, sour_ml
 
+    def _apply_citrus_rules(
+        self,
+        profile: str,
+        juices: List[StockItem],
+        juice_amounts: List[float],
+        sour_ml: float,
+        responses: Dict[str, Any],
+    ) -> tuple[List[StockItem], List[float], float]:
+        bitterness = (responses.get("bitterness_tolerance") or "").lower()
+        citrus_limit = None
+        require_soft = False
+        lime_cap = None
+        if profile in {"dessert", "candy_fun"}:
+            citrus_limit = 45.0
+            lime_cap = 10.0 if "high" not in bitterness else None
+            require_soft = True
+        elif profile == "classic_boozy":
+            citrus_limit = 30.0
+            lime_cap = 10.0 if "high" not in bitterness else None
+        elif profile == "citrus_fresh":
+            citrus_limit = 70.0
+
+        def citrus_total(amounts: Sequence[float]) -> float:
+            return sum(amount for juice, amount in zip(juices, amounts) if _is_citrus_juice(juice)) + sour_ml
+
+        adjusted_amounts = list(juice_amounts)
+
+        if lime_cap is not None:
+            for idx, juice in enumerate(juices):
+                if "lime" in juice.name.lower() or "lemon" in juice.name.lower():
+                    adjusted_amounts[idx] = min(adjusted_amounts[idx], lime_cap)
+
+        if citrus_limit is not None and citrus_total(adjusted_amounts) > citrus_limit:
+            priority = ["cranberry", "orange", "lemon", "lime"]
+            for keyword in priority:
+                if citrus_total(adjusted_amounts) <= citrus_limit:
+                    break
+                for idx, juice in enumerate(list(juices)):
+                    if keyword in juice.name.lower() and adjusted_amounts[idx] > 0:
+                        reduction = min(adjusted_amounts[idx], citrus_total(adjusted_amounts) - citrus_limit)
+                        adjusted_amounts[idx] = max(0.0, adjusted_amounts[idx] - reduction)
+                        if adjusted_amounts[idx] < 8.0 and len(juices) > 1:
+                            juices.pop(idx)
+                            adjusted_amounts.pop(idx)
+                        break
+
+        if profile == "classic_boozy" and len(juices) >= 2:
+            names = [j.name.lower() for j in juices]
+            if all(term in " ".join(names) for term in ["orange", "cranberry", "lime"]):
+                drop_idx = next((i for i, j in enumerate(juices) if "cranberry" in j.name.lower()), 1)
+                juices.pop(drop_idx)
+                adjusted_amounts.pop(drop_idx)
+
+        if require_soft:
+            soft_keywords = ("pineapple", "passion", "mango", "coconut")
+            has_soft = any(any(kw in juice.name.lower() for kw in soft_keywords) for juice in juices)
+            if not has_soft:
+                pool = [
+                    j
+                    for j in self.repository.items_for_profile(profile, role="juice")
+                    if any(kw in j.name.lower() for kw in soft_keywords)
+                ]
+                if pool:
+                    juices = juices[:1] + [pool[0]] if juices else [pool[0]]
+                    adjusted_amounts = adjusted_amounts[:1] + [max(25.0, adjusted_amounts[0] if adjusted_amounts else 25.0)]
+
+        return juices, adjusted_amounts, sour_ml
+
+    def _apply_thickness_guard(
+        self,
+        carbonation: str,
+        juices: List[StockItem],
+        juice_amounts: List[float],
+        sweet_ml: float,
+    ) -> List[float]:
+        if carbonation.startswith("still"):
+            return juice_amounts
+        thick_ml = sum(amount for juice, amount in zip(juices, juice_amounts) if _is_thick_juice(juice))
+        if thick_ml + sweet_ml <= 50.0:
+            return juice_amounts
+        adjusted = list(juice_amounts)
+        for idx, juice in enumerate(juices):
+            if _is_thick_juice(juice):
+                adjusted[idx] = max(10.0, adjusted[idx] - 12.0)
+        return adjusted
+
     def _cap_pineapple_ratio(
         self,
         juices: Sequence[StockItem],
@@ -831,10 +963,13 @@ class ProfileRecipeBuilder:
         return adjusted
 
     def _select_mixer(self, mixers: Sequence[StockItem], keywords: Sequence[str], carbonation: str) -> Optional[StockItem]:
+        fizz_keywords = ("lemonade", "soda", "tonic", "ginger")
+        if carbonation.startswith("properly"):
+            mixers = [m for m in mixers if any(token in m.name.lower() for token in fizz_keywords)]
         if not mixers and not carbonation.startswith("properly"):
             return None
         target_keywords = list(keywords)
-        if "tonic" not in target_keywords and "tonic" in [m.name.lower() for m in mixers]:
+        if "tonic" not in target_keywords and any("tonic" in m.name.lower() for m in mixers):
             target_keywords.append("tonic")
         return _pick_first_matching(list(mixers), target_keywords) if mixers else None
 
