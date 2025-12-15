@@ -1,0 +1,14 @@
+{
+  "name": "Pornstar Martini",
+  "success_score": 4.8,
+  "max_score": 5,
+  "tags": ["tropical", "vanilla", "dessert"],
+  "metadata": {"glassware": "martini glass", "ice": "none"},
+  "ingredients": [
+    {"name": "Vodka", "role": "base", "amount_ml": 50, "flavour_tags": ["vodka", "clean", "neutral"]},
+    {"name": "Passion Fruit Juice", "role": "juice", "amount_ml": 50, "flavour_tags": ["passion fruit", "tropical", "exotic"]},
+    {"name": "Pineapple Juice", "role": "juice", "amount_ml": 25, "flavour_tags": ["pineapple", "tropical", "bright"]},
+    {"name": "Caramel Syrup", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["caramel", "rich", "sweet"]},
+    {"name": "Vanilla Syrup", "role": "sweetener", "amount_ml": 10, "flavour_tags": ["vanilla", "sweet", "dessert"]}
+  ]
+}
