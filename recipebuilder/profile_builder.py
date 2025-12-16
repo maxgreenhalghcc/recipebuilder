@@ -509,11 +509,17 @@ class ProfileRecipeBuilder:
         garnish = self._pick_garnish(self.repository.items_for_profile(profile, role="garnish"), juices, prefs["garnish_keywords"])
         steps = self._build_steps(glass.name, mixer_item.name if mixer_item else None)
 
+        used_fallback = False
+        relaxed_profile = profile
+
         try:
             self._validate(profile, suggestions)
         except ValueError:
             if self._should_relax_base(responses, profile, suggestions):
-                self._validate(profile, suggestions, allow_relaxed=True)
+                relaxed_profile, suggestions, used_fallback = self._apply_base_relaxation(
+                    responses, profile, suggestions
+                )
+                self._validate(relaxed_profile, suggestions, allow_relaxed=True)
             else:
                 raise
 
@@ -523,10 +529,11 @@ class ProfileRecipeBuilder:
             ice="cubed" if glass.sparkling else "none",
             ingredients=suggestions,
             steps=steps,
-            flavour_profile=[(profile, 1.0)],
+            flavour_profile=[(relaxed_profile, 1.0)],
             garnish=garnish,
             notes=None,
             explanations=(),
+            meta={"used_fallback": True} if used_fallback else {},
         )
 
     def _profile_preferences(self, profile: str, responses: Dict[str, Any] | None = None) -> Dict[str, Any]:
@@ -1010,8 +1017,9 @@ class ProfileRecipeBuilder:
             item = suggestion.ingredient
             if suggestion.role in {"garnish", "mixer"}:
                 continue
-            if allow_relaxed and suggestion.role == "base":
-                pass
+            if allow_relaxed:
+                if profile in item.avoid_profiles:
+                    raise ValueError(f"Ingredient {item.name} avoids profile {profile}")
             else:
                 if profile not in item.profiles and not item.neutral:
                     raise ValueError(f"Ingredient {item.name} not compatible with profile {profile}")
@@ -1034,4 +1042,133 @@ class ProfileRecipeBuilder:
         if not incompatible:
             return False
         return desired in item.name.lower() or desired in (extract_spirit_family(item.name) or "")
+
+    def _fallback_sweetener(
+        self, profile: str, base_item: StockItem, disallow_dessert: bool
+    ) -> Optional[StockItem]:
+        candidates: list[StockItem] = []
+        candidates.extend(self.repository.neutral_items(role="sweetener"))
+        candidates.extend(self.repository.items_for_profile(profile, role="sweetener"))
+
+        for cand in candidates:
+            if disallow_dessert and getattr(cand, "dessert_only", False):
+                continue
+            if profile in cand.avoid_profiles:
+                continue
+            if is_creamy(cand):
+                continue
+            return cand
+        return None
+
+    def _fallback_juice(self, profile: str) -> Optional[StockItem]:
+        candidates: list[StockItem] = []
+        candidates.extend(self.repository.neutral_items(role="juice"))
+        candidates.extend(self.repository.items_for_profile(profile, role="juice"))
+        for cand in candidates:
+            if profile in cand.avoid_profiles:
+                continue
+            if is_creamy(cand):
+                continue
+            return cand
+        return None
+
+    def _apply_base_relaxation(
+        self,
+        responses: Dict[str, Any],
+        profile: str,
+        suggestions: Sequence[IngredientSuggestion],
+    ) -> tuple[str, List[IngredientSuggestion], bool]:
+        base = next((s for s in suggestions if s.role == "base"), None)
+        if base is None:
+            return profile, list(suggestions), False
+
+        base_item = base.ingredient
+        base_family = extract_spirit_family(base_item.name) or ""
+        used_fallback = False
+
+        relaxed_profile = profile
+        if profile not in base_item.profiles or profile in base_item.avoid_profiles:
+            candidates = [p for p in base_item.profiles if p not in base_item.avoid_profiles]
+            if candidates:
+                relaxed_profile = next(iter(candidates))
+                used_fallback = True
+
+        disallow_dessert = "dessert" in base_item.avoid_profiles or base_family == "tequila"
+
+        cleaned: List[IngredientSuggestion] = []
+        dessert_candidates: List[IngredientSuggestion] = []
+
+        for suggestion in suggestions:
+            item = suggestion.ingredient
+            lower_name = item.name.lower()
+            if suggestion.role in {"sweetener", "modifier"} and getattr(item, "dessert_only", False):
+                dessert_candidates.append(suggestion)
+                if disallow_dessert:
+                    used_fallback = True
+                    continue
+            if base_family == "tequila" and "amaretto" in lower_name:
+                used_fallback = True
+                continue
+            cleaned.append(suggestion)
+
+        dessert_only_clean = [s for s in cleaned if getattr(s.ingredient, "dessert_only", False)]
+        if len(dessert_only_clean) > 1:
+            keep = dessert_only_clean[0]
+            cleaned = [s for s in cleaned if s not in dessert_only_clean or s is keep]
+            used_fallback = True
+
+        has_sweetener = any(s.role == "sweetener" for s in cleaned)
+        if not has_sweetener:
+            replacement = self._fallback_sweetener(relaxed_profile, base_item, disallow_dessert)
+            if replacement:
+                ml = replacement.default_measure_ml or 15.0
+                cleaned.append(IngredientSuggestion(replacement, ml, "sweetener"))
+                used_fallback = True
+            else:
+                candidate = None
+                if not disallow_dessert:
+                    candidate = dessert_candidates[0] if dessert_candidates else None
+                else:
+                    candidate = next(
+                        (
+                            cand
+                            for cand in dessert_candidates
+                            if "amaretto" not in cand.ingredient.name.lower()
+                        ),
+                        None,
+                    )
+                if candidate:
+                    cleaned.append(candidate)
+                    used_fallback = True
+
+        cleaned_no_avoids: List[IngredientSuggestion] = []
+        for suggestion in cleaned:
+            if suggestion.role != "base" and relaxed_profile in suggestion.ingredient.avoid_profiles:
+                used_fallback = True
+                continue
+            cleaned_no_avoids.append(suggestion)
+        cleaned = cleaned_no_avoids
+
+        if not any(s.role == "juice" for s in cleaned):
+            juice_replacement = self._fallback_juice(relaxed_profile)
+            if juice_replacement:
+                ml = juice_replacement.default_measure_ml or 25.0
+                cleaned.append(IngredientSuggestion(juice_replacement, ml, "juice"))
+                used_fallback = True
+
+        dessert_after = [s for s in cleaned if getattr(s.ingredient, "dessert_only", False)]
+        if disallow_dessert and len(dessert_after) > 1:
+            keep = dessert_after[0]
+            cleaned = [s for s in cleaned if s not in dessert_after or s is keep]
+            used_fallback = True
+        if base_family == "tequila" and dessert_after:
+            non_amaretto = next((s for s in dessert_after if "amaretto" not in s.ingredient.name.lower()), None)
+            if non_amaretto and len(dessert_after) > 1:
+                cleaned = [s for s in cleaned if s not in dessert_after or s is non_amaretto]
+                used_fallback = True
+            elif dessert_after and "amaretto" in dessert_after[0].ingredient.name.lower():
+                cleaned = [s for s in cleaned if s not in dessert_after[1:]]
+                used_fallback = True
+
+        return relaxed_profile, cleaned, used_fallback
 

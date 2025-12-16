@@ -269,6 +269,41 @@ def test_no_creamy_items_in_profiles():
         assert all(not ("cream" in s.ingredient.name.lower()) for s in recipe.ingredients)
 
 
+def test_tequila_relaxation_limits_dessert_components():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "base_spirit": "tequila",
+        "season": "winter",
+        "house_type": "modern house",
+        "dining_style": "a sweet tooth indulging in rich flavours",
+        "music_preference": "pop",
+        "aroma_preference": "sweet sugar",
+        "bitterness_tolerance": "medium",
+        "sweetener_question": "rich",
+        "carbonation_texture": "still",
+        "abv_lane": "medium",
+        "allergens": "none",
+    }
+
+    profile = choose_profile(responses)
+    recipe = builder.build_recipe(responses, profile=profile, seed=2446613597)
+
+    base_name = next(s.ingredient.name for s in recipe.ingredients if s.role == "base")
+    assert "tequila" in base_name.lower()
+
+    dessert_bits = [s for s in recipe.ingredients if getattr(s.ingredient, "dessert_only", False)]
+    assert len(dessert_bits) <= 1
+    assert not (
+        any("amaretto" in s.ingredient.name.lower() for s in dessert_bits)
+        and any("caramel" in s.ingredient.name.lower() for s in dessert_bits)
+    )
+    assert recipe.meta.get("used_fallback")
+
+
 def test_pineapple_ratio_is_capped():
     items = [
         StockItem(

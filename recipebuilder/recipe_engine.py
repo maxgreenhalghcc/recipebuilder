@@ -151,6 +151,7 @@ class StockItem:
     flavour_tags: Sequence[str] = field(default_factory=list)
     default_measure_ml: float = 0.0
     spirit_subtype: Optional[str] = None
+    dessert_only: bool = False
 
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "StockItem":
@@ -174,6 +175,7 @@ class StockItem:
         neutral = bool(data.get("neutral", False))
         default_measure_ml = float(data.get("default_measure_ml", 0.0) or 0.0)
         spirit_subtype = str(data.get("spirit_subtype") or "").strip().lower() or None
+        dessert_only = bool(data.get("dessert_only", False))
 
         return cls(
             name=name,
@@ -185,6 +187,7 @@ class StockItem:
             flavour_tags=flavour_tags,
             default_measure_ml=default_measure_ml,
             spirit_subtype=spirit_subtype,
+            dessert_only=dessert_only,
         )
 
 
@@ -642,6 +645,7 @@ class CocktailRecipe:
     garnish: Optional[str] = None
     notes: Optional[str] = None
     explanations: Sequence[str] = field(default_factory=list)
+    meta: Dict[str, object] = field(default_factory=dict)
 
 
 class UnknownBarError(FileNotFoundError):
@@ -775,6 +779,8 @@ class StockRepository:
             default_measure = 20.0
 
         # If profiles are missing, use heuristics similar to the stock migration rules.
+        dessert_only = bool(item.dessert_only)
+
         if not profiles:
             profiles, avoid_profiles, inferred_neutral = _assign_profile_defaults(normalized_name, category)
             neutral = neutral or inferred_neutral
@@ -784,6 +790,9 @@ class StockRepository:
             profiles.update(extra_profiles)
             avoid_profiles.update(extra_avoids)
             neutral = neutral or inferred_neutral
+
+        if not dessert_only and _is_dessert_only_name(normalized_name):
+            dessert_only = True
 
         if family == "rum" and spirit_subtype == "light":
             profiles.add("citrus_fresh")
@@ -799,6 +808,7 @@ class StockRepository:
             flavour_tags=item.flavour_tags,
             default_measure_ml=default_measure,
             spirit_subtype=spirit_subtype,
+            dessert_only=dessert_only,
         )
 
     def items_for_profile(self, profile: str, *, role: str | None = None) -> List[StockItem]:
@@ -943,6 +953,18 @@ def _is_creamy_name(name: str) -> bool:
         "egg ",
     ]
     return any(keyword in lowered for keyword in creamy_keywords)
+
+
+def _is_dessert_only_name(name: str) -> bool:
+    lowered = _normalize(name)
+    dessert_markers = [
+        "vanilla",
+        "caramel",
+        "toffee",
+        "butterscotch",
+        "amaretto",
+    ]
+    return any(marker in lowered for marker in dessert_markers)
 
 
 def _assign_profile_defaults(name: str, category: str) -> tuple[Set[str], Set[str], bool]:
