@@ -1,5 +1,5 @@
 {
-  "bar": "lockdown",
+  "bar": "Base Bar Ingredients",
   "ingredients": [
     {
       "name": "Vodka",
@@ -64,7 +64,7 @@
       "spirit_subtype": "spiced"
     },
     {
-      "name": "Tequila Blanco",
+      "name": "Tequila",
       "category": "spirit",
       "flavour_tags": ["zesty", "fresh"],
       "profiles": ["classic_boozy", "tropical"],
@@ -78,7 +78,19 @@
     },
 
     {
-      "name": "Simple Syrup",
+      "name": "Malibu",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "coconut"],
+      "profiles": ["candy_fun", "dessert", "tropical"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 40.0,
+      "role": "base",
+      "neutral": false
+    },
+
+    {
+      "name": "Home - Made Simple Syrup",
       "category": "syrup",
       "flavour_tags": ["sweet", "neutral"],
       "profiles": ["berry", "citrus_fresh", "classic_boozy", "tropical"],
@@ -103,7 +115,7 @@
       "neutral": false
     },
     {
-      "name": "Vanilla Syrup",
+      "name": "Home-made Vanilla Syrup",
       "category": "syrup",
       "flavour_tags": ["rich", "classic"],
       "profiles": ["dessert", "tropical"],
@@ -192,6 +204,62 @@
       "default_measure_ml": 20.0,
       "role": "sour",
       "neutral": true
+    },
+
+    {
+      "name": "Mint",
+      "category": "garnish",
+      "flavour_tags": ["fresh", "cooling"],
+      "profiles": ["fresh", "cooling"],
+      "aromas": ["floral"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 0.0,
+      "role": "garnish",
+      "neutral": false
+    },
+    {
+      "name": "Lemon Wheel",
+      "category": "garnish",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["citrus_fresh", "tropical"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 0.0,
+      "role": "garnish",
+      "neutral": false
+    },
+    {
+      "name": "Orange Slice",
+      "category": "garnish",
+      "flavour_tags": ["zesty", "classic"],
+      "profiles": ["citrus_fresh", "tropical"],
+      "aromas": ["citrus"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 0.0,
+      "role": "garnish",
+      "neutral": false
+    },
+    {
+      "name": "Lime Slice",
+      "category": "garnish",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["citrus_fresh", "tropical"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 0.0,
+      "role": "garnish",
+      "neutral": false
+    },
+    {
+      "name": "Berries",
+      "category": "garnish",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["berry", "candy_fun"],
+      "aromas": ["sweet"],
+      "seasons": ["spring"],
+      "default_measure_ml": 0.0,
+      "role": "garnish",
+      "neutral": false
     }
   ]
 }
