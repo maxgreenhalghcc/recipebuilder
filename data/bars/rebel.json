@@ -25,17 +25,6 @@
       "neutral": false
     },
     {
-      "name": "Absolut Vodka",
-      "category": "spirit",
-      "flavour_tags": ["clean", "smooth"],
-      "profiles": ["berry", "candy_fun", "citrus_fresh", "classic_boozy", "dessert", "tropical"],
-      "aromas": ["citrus"],
-      "seasons": ["spring", "summer"],
-      "default_measure_ml": 50.0,
-      "role": "base",
-      "neutral": false
-    },
-    {
       "name": "Smirnoff Vanilla Vodka",
       "category": "spirit",
       "flavour_tags": ["rich", "classic"],
@@ -67,18 +56,6 @@
       "profiles": ["berry", "candy_fun", "citrus_fresh"],
       "aromas": ["floral", "citrus"],
       "seasons": ["spring"],
-      "default_measure_ml": 50.0,
-      "role": "base",
-      "avoid_profiles": ["dessert"],
-      "neutral": false
-    },
-    {
-      "name": "Tanqueray Dry Gin",
-      "category": "spirit",
-      "flavour_tags": ["botanical", "clean"],
-      "profiles": ["berry", "candy_fun", "citrus_fresh"],
-      "aromas": ["citrus", "floral"],
-      "seasons": ["spring", "summer"],
       "default_measure_ml": 50.0,
       "role": "base",
       "avoid_profiles": ["dessert"],
@@ -145,7 +122,7 @@
       "spirit_subtype": "light"
     },
     {
-      "name": "Bacardi",
+      "name": "Bacardi White Rum",
       "category": "spirit",
       "flavour_tags": ["tropical", "light"],
       "profiles": ["candy_fun", "dessert", "tropical"],
@@ -197,7 +174,7 @@
       "spirit_subtype": "spiced"
     },
     {
-      "name": "Malibu",
+      "name": "Malibu Coconut Rum",
       "category": "spirit",
       "flavour_tags": ["tropical", "coconut"],
       "profiles": ["candy_fun", "dessert", "tropical"],
@@ -220,6 +197,19 @@
       "avoid_profiles": ["candy_fun", "dessert"],
       "neutral": false,
       "spirit_subtype": "light"
+    },
+
+    {
+      "name": "Jack Daniel's Tennessee Whiskey",
+      "category": "spirit",
+      "flavour_tags": ["woody", "warm"],
+      "profiles": ["classic_boozy", "dessert"],
+      "aromas": ["woody", "sweet"],
+      "seasons": ["autumn", "winter"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["citrus_fresh"],
+      "neutral": false
     },
 
     {
@@ -256,6 +246,17 @@
       "role": "modifier",
       "neutral": false,
       "is_creamy": true
+    },
+    {
+      "name": "Blue Curaçao Orange Liqueur",
+      "category": "modifier",
+      "flavour_tags": ["zesty", "vibrant"],
+      "profiles": ["candy_fun", "tropical", "classic_boozy"],
+      "aromas": ["citrus", "sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 20.0,
+      "role": "modifier",
+      "neutral": false
     },
 
     {
@@ -408,18 +409,6 @@
       "neutral": false
     },
     {
-      "name": "Banana Syrup",
-      "category": "syrup",
-      "flavour_tags": ["tropical", "sweet"],
-      "profiles": ["dessert", "tropical"],
-      "aromas": ["banana"],
-      "seasons": ["summer"],
-      "spirits": ["rum"],
-      "default_measure_ml": 15.0,
-      "role": "sweetener",
-      "neutral": false
-    },
-    {
       "name": "Pineapple Syrup",
       "category": "syrup",
       "flavour_tags": ["tropical", "vibrant"],
@@ -457,17 +446,6 @@
       "neutral": true
     },
 
-    {
-      "name": "Mint",
-      "category": "garnish",
-      "flavour_tags": ["fresh", "herbal"],
-      "profiles": ["citrus_fresh", "tropical"],
-      "aromas": ["herbal"],
-      "seasons": ["summer"],
-      "default_measure_ml": 0.0,
-      "role": "garnish",
-      "neutral": false
-    },
     {
       "name": "Lemon Wheel",
       "category": "garnish",
@@ -536,4 +514,5 @@
     }
   ]
 }
+
 
