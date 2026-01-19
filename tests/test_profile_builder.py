@@ -244,6 +244,58 @@ def test_choose_profile_mapping_cases():
     }
     assert choose_profile(boozy_case) == "classic_boozy"
 
+
+def test_measurement_normalizer_uses_bar_measures():
+    repo = StockRepository()
+    repo.prime_cache("demo-bar")
+    builder = ProfileRecipeBuilder(repo)
+
+    responses = {
+        "bar_id": "demo-bar",
+        "base_spirit": "vodka",
+        "season": "summer",
+        "house_type": "beach house",
+        "dining_style": "refreshing and vibrant flavours which awaken my senses",
+        "carbonation_texture": "properly sparkling",
+        "abv_lane": "medium",
+    }
+
+    recipe = builder.build_recipe(responses, profile="tropical", seed=42)
+
+    base_measures = {25.0, 35.0, 50.0}
+    fortified_measures = {5.0, 10.0, 15.0}
+    liqueur_measures = {5.0, 10.0, 15.0, 20.0}
+    syrup_measures = {5.0, 10.0, 15.0}
+    citrus_measures = {10.0, 15.0, 20.0, 25.0}
+    mixer_measures = {50.0, 75.0, 100.0, 125.0}
+
+    for suggestion in recipe.ingredients:
+        name = suggestion.ingredient.name.lower()
+        amount = suggestion.amount_ml
+        if "bitters" in name or "salt" in name or "saline" in name:
+            assert amount == 0.0
+            continue
+        if suggestion.role == "base":
+            assert amount in base_measures
+            continue
+        if suggestion.role == "mixer":
+            assert amount in mixer_measures
+            continue
+        if suggestion.role == "sweetener":
+            assert amount == 0.0 or amount in syrup_measures
+            continue
+        if suggestion.role == "sour":
+            assert amount in citrus_measures
+            continue
+        if suggestion.role == "modifier":
+            if "vermouth" in name or "sherry" in name:
+                assert amount in fortified_measures
+            else:
+                assert amount in liqueur_measures
+            continue
+        if suggestion.role == "juice":
+            assert amount in citrus_measures
+
     dessert_case = {
         "season": "winter",
         "dining_style": "sweet tooth indulging in rich flavours",
@@ -302,6 +354,57 @@ def test_tequila_relaxation_limits_dessert_components():
         and any("caramel" in s.ingredient.name.lower() for s in dessert_bits)
     )
     assert recipe.meta.get("used_fallback")
+
+
+def test_martini_falls_back_without_vermouth():
+    items = [
+        StockItem(
+            name="Tequila Blanco",
+            category="spirit",
+            role="base",
+            profiles={"classic_boozy"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=50.0,
+        ),
+        StockItem(
+            name="Orange Juice",
+            category="juice",
+            role="juice",
+            profiles={"classic_boozy"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=25.0,
+        ),
+        StockItem(
+            name="Lemon Juice",
+            category="sour",
+            role="sour",
+            profiles={"classic_boozy"},
+            avoid_profiles=set(),
+            neutral=True,
+            default_measure_ml=20.0,
+        ),
+        StockItem(
+            name="Simple Syrup",
+            category="syrup",
+            role="sweetener",
+            profiles={"classic_boozy"},
+            avoid_profiles=set(),
+            neutral=False,
+            default_measure_ml=15.0,
+        ),
+    ]
+
+    repo = _MiniRepository(items)
+    builder = ProfileRecipeBuilder(repo)
+    responses = {"bar_id": "mini", "house_type": "modern house", "base_spirit": "tequila"}
+
+    recipe = builder.build_recipe(responses, profile="classic_boozy", seed=9)
+
+    assert all("vermouth" not in s.ingredient.name.lower() for s in recipe.ingredients)
+    total_liquid = sum(s.amount_ml for s in recipe.ingredients if s.amount_ml > 0)
+    assert 90.0 <= total_liquid <= 120.0
 
 
 def test_pineapple_ratio_is_capped():

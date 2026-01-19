@@ -48,6 +48,182 @@ PROFILE_FLAVOUR_WORDS: Dict[str, List[str]] = {
 
 MAX_SHARED_INGREDIENT_RATIO = 0.7
 
+_BASE_MEASURES = (25.0, 35.0, 50.0)
+_FORTIFIED_MEASURES = (5.0, 10.0, 15.0)
+_LIQUEUR_MEASURES = (5.0, 10.0, 15.0, 20.0)
+_SYRUP_MEASURES = (5.0, 10.0, 15.0)
+_CITRUS_MEASURES = (10.0, 15.0, 20.0, 25.0)
+_MIXER_MEASURES = (50.0, 75.0, 100.0, 125.0)
+
+_FAMILY_TARGETS = {
+    "highball": {
+        "total_min": 160.0,
+        "total_max": 220.0,
+        "alcohol_min": 35.0,
+        "alcohol_max": 50.0,
+        "mixer_min": 100.0,
+        "sweet_min": 5.0,
+        "sweet_max": 15.0,
+        "citrus_min": 10.0,
+        "citrus_max": 20.0,
+    },
+    "sour": {
+        "total_min": 90.0,
+        "total_max": 120.0,
+        "alcohol_min": 35.0,
+        "alcohol_max": 50.0,
+        "citrus_min": 20.0,
+        "citrus_max": 30.0,
+        "sweet_min": 10.0,
+        "sweet_max": 20.0,
+        "liqueur_max": 15.0,
+    },
+    "martini": {
+        "total_min": 70.0,
+        "total_max": 90.0,
+        "alcohol_max": 50.0,
+        "vermouth_min": 5.0,
+        "vermouth_max": 15.0,
+    },
+    "tiki": {
+        "alcohol_min": 40.0,
+        "alcohol_max": 60.0,
+        "juice_mixer_min": 90.0,
+        "sweet_min": 10.0,
+        "sweet_max": 20.0,
+    },
+}
+
+
+def _is_bitters_or_salt(item: StockItem) -> bool:
+    name = item.name.lower()
+    return "bitters" in name or "salt" in name or "saline" in name
+
+
+def _nearest_allowed(amount: float, allowed: Sequence[float]) -> float:
+    return min(allowed, key=lambda value: abs(value - amount))
+
+
+def _floor_allowed(amount: float, allowed: Sequence[float]) -> float:
+    candidates = [value for value in allowed if value <= amount]
+    if candidates:
+        return max(candidates)
+    return min(allowed)
+
+
+def _measurement_bucket(suggestion: IngredientSuggestion) -> Optional[Sequence[float]]:
+    item = suggestion.ingredient
+    name = item.name.lower()
+    if _is_bitters_or_salt(item):
+        return None
+    if suggestion.role == "base" or item.category == "spirit":
+        return _BASE_MEASURES
+    if "vermouth" in name or "sherry" in name:
+        return _FORTIFIED_MEASURES
+    if suggestion.role == "sweetener" or item.category == "syrup":
+        return _SYRUP_MEASURES
+    if suggestion.role == "mixer" or item.category == "mixer":
+        return _MIXER_MEASURES
+    if _is_sour(item) or item.category == "sour":
+        return _CITRUS_MEASURES
+    if item.category == "modifier" or "liqueur" in name or "schnapps" in name or "amaretto" in name:
+        return _LIQUEUR_MEASURES
+    if item.category == "juice":
+        return _CITRUS_MEASURES
+    return None
+
+
+def _role_group(suggestions: Iterable[IngredientSuggestion], roles: Set[str]) -> List[IngredientSuggestion]:
+    return [s for s in suggestions if s.role in roles and s.amount_ml > 0]
+
+
+def _sum_amounts(items: Iterable[IngredientSuggestion]) -> float:
+    return sum(item.amount_ml for item in items if item.amount_ml > 0)
+
+
+def _scale_group(items: Iterable[IngredientSuggestion], target_total: float, minimum: float = 0.0) -> None:
+    items = [item for item in items if item.amount_ml > 0]
+    current = _sum_amounts(items)
+    if current <= 0:
+        return
+    scale = target_total / current
+    for item in items:
+        item.amount_ml = max(minimum, item.amount_ml * scale)
+
+
+def _is_vermouth(item: StockItem) -> bool:
+    return "vermouth" in item.name.lower() or "sherry" in item.name.lower()
+
+
+def _normalize_measurements(suggestions: List[IngredientSuggestion]) -> List[IngredientSuggestion]:
+    for suggestion in suggestions:
+        if suggestion.amount_ml <= 0:
+            continue
+        bucket = _measurement_bucket(suggestion)
+        if bucket is None:
+            suggestion.amount_ml = 0.0
+            continue
+        normalized = _nearest_allowed(suggestion.amount_ml, bucket)
+        suggestion.amount_ml = min(max(normalized, bucket[0]), bucket[-1])
+    return suggestions
+
+
+def _enforce_alcohol_total(suggestions: List[IngredientSuggestion], target_total: float = 50.0) -> None:
+    alcohol_items = [
+        s
+        for s in suggestions
+        if s.amount_ml > 0 and (s.role in {"base", "modifier"} or s.ingredient.category in {"spirit", "modifier"})
+    ]
+    if not alcohol_items:
+        return
+    if len(alcohol_items) == 1:
+        alcohol_items[0].amount_ml = _nearest_allowed(target_total, _measurement_bucket(alcohol_items[0]) or _BASE_MEASURES)
+        return
+    _scale_group(alcohol_items, target_total, minimum=5.0)
+    _normalize_measurements(alcohol_items)
+    total = _sum_amounts(alcohol_items)
+    if abs(total - target_total) < 0.01:
+        return
+    base_items = [s for s in alcohol_items if s.role == "base"]
+    adjust_items = base_items or alcohol_items
+    for item in adjust_items:
+        bucket = _measurement_bucket(item) or _BASE_MEASURES
+        other_total = total - item.amount_ml
+        needed = target_total - other_total
+        if needed in bucket:
+            item.amount_ml = needed
+            return
+        candidate = _nearest_allowed(needed, bucket)
+        if abs(candidate - needed) <= 5.0:
+            item.amount_ml = candidate
+            return
+
+
+def _enforce_pineapple_ratio(suggestions: List[IngredientSuggestion], max_ratio: float = 0.25) -> List[IngredientSuggestion]:
+    pineapple = [s for s in suggestions if s.role == "juice" and "pineapple" in s.ingredient.name.lower()]
+    if not pineapple:
+        return suggestions
+
+    non_pineapple_total = sum(
+        s.amount_ml
+        for s in suggestions
+        if s.role in {"juice", "sour"} and "pineapple" not in s.ingredient.name.lower()
+    )
+    if non_pineapple_total <= 0:
+        return suggestions
+
+    max_pineapple = max_ratio / (1 - max_ratio) * non_pineapple_total
+    current_pineapple = sum(s.amount_ml for s in pineapple)
+    if current_pineapple <= max_pineapple:
+        return suggestions
+
+    scale = max_pineapple / current_pineapple if current_pineapple > 0 else 1.0
+    for suggestion in pineapple:
+        bucket = _measurement_bucket(suggestion) or _CITRUS_MEASURES
+        target = suggestion.amount_ml * scale
+        suggestion.amount_ml = _floor_allowed(target, bucket)
+    return suggestions
+
 
 def _is_sour(item: StockItem) -> bool:
     name = item.name.lower()
@@ -72,6 +248,11 @@ def _is_citrus_juice(item: StockItem) -> bool:
 def _is_thick_juice(item: StockItem) -> bool:
     name = item.name.lower()
     return any(token in name for token in ("passion", "mango", "puree", "banana", "guava"))
+
+
+def _is_easy_garnish(name: str) -> bool:
+    easy_tokens = ("wedge", "twist", "wheel", "peel", "cherry", "olive")
+    return any(token in name.lower() for token in easy_tokens)
 
 
 def _ingredient_key_set(recipe: CocktailRecipe) -> Set[str]:
@@ -369,6 +550,7 @@ class ProfileRecipeBuilder:
         responses: Dict[str, Any],
         profile: str,
         rnd: random.Random,
+        family_override: Optional[str] = None,
     ) -> CocktailRecipe:
         abv_lane = (responses.get("abv_lane") or "medium").strip().lower()
         base_target = {"strong": 60.0, "medium": 50.0, "low": 40.0}.get(abv_lane, 50.0)
@@ -414,6 +596,7 @@ class ProfileRecipeBuilder:
         modifier = self._choose_modifier(profile_items("modifier"), prefs["modifier_keywords"])
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
         sour = self._maybe_add_sour(profile, available_sours, prefs["needs_sour"])
+        family = family_override or self._select_family(profile, glass, responses, vermouth_available)
 
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
@@ -506,7 +689,26 @@ class ProfileRecipeBuilder:
         if mixer_item and mixer_ml > 0:
             suggestions.append(IngredientSuggestion(mixer_item, mixer_ml, "mixer"))
 
-        garnish = self._pick_garnish(self.repository.items_for_profile(profile, role="garnish"), juices, prefs["garnish_keywords"])
+        try:
+            self._apply_family_targets(suggestions, family, profile_items("mixer"))
+        except ValueError:
+            family = "sour"
+            self._apply_family_targets(suggestions, family, profile_items("mixer"))
+
+        _normalize_measurements(suggestions)
+        _enforce_alcohol_total(suggestions, 50.0)
+        _normalize_measurements(suggestions)
+        _enforce_pineapple_ratio(suggestions)
+
+        garnish = self._format_garnish_bundle(
+            self._select_garnish_bundle(
+                profile,
+                glass.name,
+                self.repository.items_for_profile(profile, role="garnish"),
+                juices,
+                prefs["garnish_keywords"],
+            )
+        )
         steps = self._build_steps(glass.name, mixer_item.name if mixer_item else None)
 
         used_fallback = False
@@ -519,6 +721,10 @@ class ProfileRecipeBuilder:
                 relaxed_profile, suggestions, used_fallback = self._apply_base_relaxation(
                     responses, profile, suggestions
                 )
+                _normalize_measurements(suggestions)
+                _enforce_alcohol_total(suggestions, 50.0)
+                _normalize_measurements(suggestions)
+                _enforce_pineapple_ratio(suggestions)
                 self._validate(relaxed_profile, suggestions, allow_relaxed=True)
             else:
                 raise
@@ -533,7 +739,7 @@ class ProfileRecipeBuilder:
             garnish=garnish,
             notes=None,
             explanations=(),
-            meta={"used_fallback": True} if used_fallback else {},
+            meta={"used_fallback": True, "family": family} if used_fallback else {"family": family},
         )
 
     def _profile_preferences(self, profile: str, responses: Dict[str, Any] | None = None) -> Dict[str, Any]:
@@ -626,6 +832,134 @@ class ProfileRecipeBuilder:
         if carbonation.startswith("properly") or carbonation.startswith("light"):
             return Glass("long glass", 400, sparkling=True)
         return Glass("martini glass", 250, sparkling=False)
+
+    def _select_family(
+        self,
+        profile: str,
+        glass: Glass,
+        responses: Dict[str, Any],
+        has_vermouth: bool,
+    ) -> str:
+        if profile == "tropical":
+            return "tiki"
+        if profile == "candy_fun":
+            return "highball" if glass.sparkling else "tiki"
+        if profile == "citrus_fresh":
+            return "highball" if glass.sparkling else "sour"
+        if profile == "classic_boozy":
+            if has_vermouth and "martini" in glass.name:
+                return "martini"
+            return "sour"
+        if profile == "dessert":
+            return "sour"
+        if glass.sparkling:
+            return "highball"
+        if has_vermouth and "martini" in glass.name:
+            return "martini"
+        return "sour"
+
+
+    def _apply_family_targets(
+        self,
+        suggestions: List[IngredientSuggestion],
+        family: str,
+        mixer_candidates: Sequence[StockItem],
+    ) -> None:
+        targets = _FAMILY_TARGETS.get(family)
+        if not targets:
+            return
+
+        alcohol_items = [
+            s
+            for s in suggestions
+            if s.amount_ml > 0 and (s.role in {"base", "modifier"} or s.ingredient.category == "spirit")
+        ]
+        sweet_items = _role_group(suggestions, {"sweetener"})
+        citrus_items = [
+            s
+            for s in suggestions
+            if s.role in {"juice", "sour"}
+            and any(tok in s.ingredient.name.lower() for tok in ("orange", "cranberry", "lemon", "lime", "grapefruit"))
+        ]
+        mixer_items = _role_group(suggestions, {"mixer"})
+        juice_items = _role_group(suggestions, {"juice"})
+        vermouth_items = [s for s in suggestions if _is_vermouth(s.ingredient)]
+
+        if family == "martini":
+            if not vermouth_items:
+                raise ValueError("No vermouth available for martini family.")
+            if sweet_items:
+                for item in sweet_items:
+                    item.amount_ml = 0.0
+            vermouth_total = _sum_amounts(vermouth_items)
+            if vermouth_total < targets["vermouth_min"]:
+                _scale_group(vermouth_items, targets["vermouth_min"])
+            if vermouth_total > targets["vermouth_max"]:
+                _scale_group(vermouth_items, targets["vermouth_max"])
+            alcohol_total = _sum_amounts(alcohol_items)
+            if alcohol_total > targets["alcohol_max"]:
+                _scale_group(alcohol_items, targets["alcohol_max"])
+
+        if family == "sour":
+            citrus_total = _sum_amounts(citrus_items)
+            if citrus_total < targets["citrus_min"]:
+                _scale_group(citrus_items, targets["citrus_min"], minimum=10.0)
+            if citrus_total > targets["citrus_max"]:
+                _scale_group(citrus_items, targets["citrus_max"], minimum=10.0)
+            sweet_total = _sum_amounts(sweet_items)
+            if sweet_total < targets["sweet_min"]:
+                _scale_group(sweet_items, targets["sweet_min"], minimum=5.0)
+            if sweet_total > targets["sweet_max"]:
+                _scale_group(sweet_items, targets["sweet_max"], minimum=5.0)
+            modifier_items = [s for s in suggestions if s.role == "modifier"]
+            modifier_total = _sum_amounts(modifier_items)
+            if modifier_total > targets["liqueur_max"]:
+                _scale_group(modifier_items, targets["liqueur_max"], minimum=5.0)
+
+        if family in {"highball", "tiki"}:
+            sweet_total = _sum_amounts(sweet_items)
+            if sweet_total < targets["sweet_min"]:
+                _scale_group(sweet_items, targets["sweet_min"], minimum=5.0)
+            if sweet_total > targets["sweet_max"]:
+                _scale_group(sweet_items, targets["sweet_max"], minimum=5.0)
+
+        alcohol_total = _sum_amounts(alcohol_items)
+        if "alcohol_min" in targets and alcohol_total < targets["alcohol_min"]:
+            _scale_group(alcohol_items, targets["alcohol_min"], minimum=10.0)
+        if "alcohol_max" in targets and alcohol_total > targets["alcohol_max"]:
+            _scale_group(alcohol_items, targets["alcohol_max"], minimum=10.0)
+
+        if family == "highball":
+            citrus_total = _sum_amounts(citrus_items)
+            if citrus_total < targets["citrus_min"]:
+                _scale_group(citrus_items, targets["citrus_min"], minimum=10.0)
+            if citrus_total > targets["citrus_max"]:
+                _scale_group(citrus_items, targets["citrus_max"], minimum=10.0)
+
+        if family in {"highball", "tiki"} and targets.get("mixer_min"):
+            if not mixer_items and mixer_candidates:
+                suggestions.append(IngredientSuggestion(mixer_candidates[0], targets["mixer_min"], "mixer"))
+                mixer_items = [suggestions[-1]]
+            mixer_total = _sum_amounts(mixer_items)
+            if mixer_items and mixer_total < targets["mixer_min"]:
+                _scale_group(mixer_items, targets["mixer_min"], minimum=targets["mixer_min"])
+
+        if family == "tiki":
+            juice_mixer_total = _sum_amounts(juice_items) + _sum_amounts(mixer_items)
+            if juice_mixer_total < targets["juice_mixer_min"] and juice_items:
+                _scale_group(juice_items, targets["juice_mixer_min"], minimum=15.0)
+
+        total_liquid = _sum_amounts([s for s in suggestions if s.amount_ml > 0])
+        if "total_min" in targets and total_liquid < targets["total_min"]:
+            if mixer_items:
+                _scale_group(mixer_items, targets["total_min"], minimum=targets.get("mixer_min", 0.0))
+            elif juice_items:
+                _scale_group(juice_items, targets["total_min"], minimum=15.0)
+        if "total_max" in targets and total_liquid > targets["total_max"]:
+            if mixer_items:
+                _scale_group(mixer_items, targets["total_max"], minimum=targets.get("mixer_min", 0.0))
+            elif juice_items:
+                _scale_group(juice_items, targets["total_max"], minimum=15.0)
 
     def _choose_base(
         self,
@@ -980,15 +1314,61 @@ class ProfileRecipeBuilder:
             target_keywords.append("tonic")
         return _pick_first_matching(list(mixers), target_keywords) if mixers else None
 
-    def _pick_garnish(self, garnishes: Sequence[StockItem], juices: Sequence[StockItem], keywords: Sequence[str]) -> str:
-        choices = list(garnishes)
-        if juices:
-            juice_tokens = " ".join(j.name.lower() for j in juices).split()
-            garnish = _pick_first_matching(choices, juice_tokens)
-            if garnish:
-                return garnish.name
-        garnish = _pick_first_matching(choices, keywords)
-        return garnish.name if garnish else ""
+    def _select_garnish_bundle(
+        self,
+        profile: str,
+        glass_name: str,
+        garnishes: Sequence[StockItem],
+        juices: Sequence[StockItem],
+        keywords: Sequence[str],
+    ) -> Dict[str, str]:
+        options = list(garnishes)
+        juice_tokens = " ".join(j.name.lower() for j in juices).split()
+        garnish_rules = {
+            "citrus_fresh": ["lemon", "lime", "peel", "twist", "wheel"],
+            "tropical": ["mint", "pineapple", "orange", "citrus"],
+            "dessert": ["orange", "nutmeg", "chocolate", "cocoa"],
+            "classic_boozy": ["orange", "cherry", "olive"],
+            "berry": ["berry", "lemon", "lime"],
+            "candy_fun": ["berry", "orange", "lemon"],
+        }
+
+        primary = _pick_first_matching(options, juice_tokens)
+        if not primary:
+            primary = _pick_first_matching(options, garnish_rules.get(profile, []))
+        if not primary:
+            primary = _pick_first_matching(options, keywords)
+        primary_name = primary.name if primary else ""
+
+        secondary_candidates = [g for g in options if g.name != primary_name and _is_easy_garnish(g.name)]
+        secondary = _pick_first_matching(secondary_candidates, garnish_rules.get(profile, [])) if secondary_candidates else None
+        if not secondary and secondary_candidates:
+            secondary = secondary_candidates[0]
+        secondary_name = secondary.name if secondary else ""
+
+        optional_candidates = [g for g in options if g.name not in {primary_name, secondary_name}]
+        optional = _pick_first_matching(optional_candidates, garnish_rules.get(profile, []))
+        optional_name = optional.name if optional else ""
+
+        if not secondary_name and options:
+            fallback_easy = _pick_first_matching(options, ["lemon", "lime", "orange", "cherry"])
+            if fallback_easy and fallback_easy.name != primary_name:
+                secondary_name = fallback_easy.name
+
+        return {
+            "primary": primary_name or "Lemon twist",
+            "secondary": secondary_name or "Cocktail cherry",
+            "optional": optional_name,
+        }
+
+    def _format_garnish_bundle(self, bundle: Dict[str, str]) -> str:
+        primary = bundle.get("primary", "").strip()
+        secondary = bundle.get("secondary", "").strip()
+        optional = bundle.get("optional", "").strip()
+        parts = [primary, secondary]
+        if optional:
+            parts.append(optional)
+        return ", ".join([part for part in parts if part])
 
     def _build_steps(self, glass: str, mixer: Optional[str]) -> List[str]:
         steps = [
@@ -1171,4 +1551,3 @@ class ProfileRecipeBuilder:
                 used_fallback = True
 
         return relaxed_profile, cleaned, used_fallback
-
