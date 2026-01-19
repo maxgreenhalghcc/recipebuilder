@@ -1,0 +1,660 @@
+{
+  "enchanted": {
+    "flavour_matrix": [
+      {
+        "type": "spirit",
+        "name": "normal gin",
+        "seasons": [
+          "spring"
+        ],
+        "aromas": [
+          "floral",
+          "citrus"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "citrus_fresh"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "pink gin",
+        "seasons": [
+          "spring"
+        ],
+        "aromas": [
+          "floral"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "citrus_fresh"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "passion fruit gin",
+        "seasons": [
+          "summer",
+          "winter"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "citrus_fresh"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "lemon gin",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "citrus"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "citrus_fresh"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "amaretto",
+        "seasons": [
+          "autumn"
+        ],
+        "aromas": [
+          "woody"
+        ],
+        "profiles": [
+          "dessert",
+          "tropical"
+        ],
+        "category": "modifier",
+        "role": "modifier",
+        "avoid_profiles": [
+          "candy_fun",
+          "citrus_fresh"
+        ],
+        "neutral": false,
+        "default_measure_ml": 20.0
+      },
+      {
+        "type": "spirit",
+        "name": "white rum",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "candy_fun",
+          "dessert",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "citrus_fresh",
+          "classic_boozy"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "dark rum",
+        "seasons": [
+          "autumn",
+          "winter"
+        ],
+        "aromas": [
+          "woody"
+        ],
+        "profiles": [
+          "candy_fun",
+          "dessert",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "citrus_fresh",
+          "classic_boozy"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "spiced rum",
+        "seasons": [
+          "autumn"
+        ],
+        "aromas": [
+          "woody"
+        ],
+        "profiles": [
+          "candy_fun",
+          "dessert",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "citrus_fresh",
+          "classic_boozy"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "tequila",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "citrus"
+        ],
+        "profiles": [
+          "classic_boozy",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "candy_fun",
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "vodka",
+        "seasons": [
+          "spring",
+          "summer"
+        ],
+        "aromas": [
+          "citrus",
+          "sweet"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "citrus_fresh",
+          "classic_boozy",
+          "dessert",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "neutral": true,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "malibu",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "spirit",
+        "name": "passoa",
+        "seasons": [
+          "summer",
+          "winter"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "modifier",
+        "role": "modifier",
+        "neutral": false,
+        "default_measure_ml": 20.0
+      },
+      {
+        "type": "spirit",
+        "name": "peach schnapps",
+        "seasons": [
+          "spring",
+          "summer"
+        ],
+        "aromas": [
+          "fruity"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "modifier",
+        "role": "modifier",
+        "neutral": false,
+        "default_measure_ml": 20.0
+      },
+      {
+        "type": "syrup",
+        "name": "grenadine",
+        "seasons": [
+          "spring",
+          "summer"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "classic_boozy",
+          "tropical"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "avoid_profiles": [
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "syrup",
+        "name": "elderflower syrup",
+        "seasons": [
+          "spring"
+        ],
+        "aromas": [
+          "floral"
+        ],
+        "profiles": [
+          "berry",
+          "citrus_fresh",
+          "classic_boozy",
+          "tropical"
+        ],
+        "category": "syrup",
+        "role": "sweetener",
+        "neutral": false,
+        "default_measure_ml": 15.0
+      },
+      {
+        "type": "syrup",
+        "name": "vanilla syrup",
+        "seasons": [
+          "winter"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "dessert",
+          "tropical"
+        ],
+        "category": "syrup",
+        "role": "sweetener",
+        "avoid_profiles": [
+          "candy_fun",
+          "citrus_fresh",
+          "classic_boozy"
+        ],
+        "neutral": false,
+        "default_measure_ml": 15.0
+      },
+      {
+        "type": "syrup",
+        "name": "simple syrup",
+        "seasons": [
+          "all"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "berry",
+          "citrus_fresh",
+          "classic_boozy",
+          "tropical"
+        ],
+        "category": "syrup",
+        "role": "sweetener",
+        "neutral": false,
+        "default_measure_ml": 15.0
+      },
+      {
+        "type": "syrup",
+        "name": "caramel syrup",
+        "seasons": [
+          "autumn",
+          "winter"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "candy_fun",
+          "dessert"
+        ],
+        "category": "syrup",
+        "role": "sweetener",
+        "avoid_profiles": [
+          "citrus_fresh",
+          "classic_boozy",
+          "tropical"
+        ],
+        "neutral": false,
+        "default_measure_ml": 15.0
+      },
+      {
+        "type": "syrup",
+        "name": "maple syrup",
+        "seasons": [
+          "autumn"
+        ],
+        "aromas": [
+          "woody",
+          "sweet"
+        ],
+        "profiles": [
+          "dessert",
+          "tropical"
+        ],
+        "category": "syrup",
+        "role": "sweetener",
+        "avoid_profiles": [
+          "candy_fun"
+        ],
+        "neutral": false,
+        "default_measure_ml": 15.0
+      },
+      {
+        "type": "juice",
+        "name": "orange juice",
+        "seasons": [
+          "spring"
+        ],
+        "aromas": [
+          "citrus"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "juice",
+        "role": "juice",
+        "avoid_profiles": [
+          "candy_fun",
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 25.0
+      },
+      {
+        "type": "juice",
+        "name": "pineapple juice",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "candy_fun",
+          "classic_boozy",
+          "dessert",
+          "tropical"
+        ],
+        "category": "juice",
+        "role": "juice",
+        "avoid_profiles": [
+          "classic_boozy"
+        ],
+        "neutral": false,
+        "default_measure_ml": 25.0
+      },
+      {
+        "type": "juice",
+        "name": "cranberry juice",
+        "seasons": [
+          "autumn"
+        ],
+        "aromas": [
+          "woody"
+        ],
+        "profiles": [
+          "berry",
+          "candy_fun",
+          "citrus_fresh"
+        ],
+        "category": "juice",
+        "role": "juice",
+        "avoid_profiles": [
+          "classic_boozy",
+          "dessert"
+        ],
+        "neutral": false,
+        "default_measure_ml": 25.0
+      },
+      {
+        "type": "juice",
+        "name": "passion fruit juice",
+        "seasons": [
+          "winter"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "dessert",
+          "tropical"
+        ],
+        "category": "juice",
+        "role": "juice",
+        "avoid_profiles": [
+          "classic_boozy"
+        ],
+        "neutral": false,
+        "default_measure_ml": 25.0
+      },
+      {
+        "type": "garnish",
+        "name": "mint",
+        "seasons": [
+          "spring",
+          "summer"
+        ],
+        "aromas": [
+          "floral"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "garnish",
+        "role": "garnish",
+        "neutral": false,
+        "default_measure_ml": 0.0
+      },
+      {
+        "type": "garnish",
+        "name": "lemon",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "citrus"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "garnish",
+        "role": "garnish",
+        "neutral": false,
+        "default_measure_ml": 0.0
+      },
+      {
+        "type": "garnish",
+        "name": "passion fruit",
+        "seasons": [
+          "summer",
+          "winter"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "garnish",
+        "role": "garnish",
+        "neutral": false,
+        "default_measure_ml": 0.0
+      },
+      {
+        "type": "garnish",
+        "name": "pineapple",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "garnish",
+        "role": "garnish",
+        "neutral": false,
+        "default_measure_ml": 0.0
+      },
+      {
+        "type": "garnish",
+        "name": "orange",
+        "seasons": [
+          "spring",
+          "summer"
+        ],
+        "aromas": [
+          "citrus"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "garnish",
+        "role": "garnish",
+        "neutral": false,
+        "default_measure_ml": 0.0
+      },
+      {
+        "type": "garnish",
+        "name": "raspberries",
+        "seasons": [
+          "spring"
+        ],
+        "aromas": [
+          "sweet"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "garnish",
+        "role": "garnish",
+        "neutral": false,
+        "default_measure_ml": 0.0
+      },
+      {
+        "type": "modifier",
+        "name": "bitters",
+        "seasons": [
+          "autumn",
+          "winter"
+        ],
+        "aromas": [
+          "woody"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "classic_boozy"
+        ],
+        "category": "spirit",
+        "role": "base",
+        "neutral": false,
+        "default_measure_ml": 50.0
+      },
+      {
+        "type": "modifier",
+        "name": "lime juice",
+        "seasons": [
+          "summer"
+        ],
+        "aromas": [
+          "citrus"
+        ],
+        "profiles": [
+          "citrus_fresh",
+          "tropical"
+        ],
+        "category": "sour",
+        "role": "sour",
+        "neutral": true,
+        "default_measure_ml": 20.0
+      }
+    ]
+  }
+}
