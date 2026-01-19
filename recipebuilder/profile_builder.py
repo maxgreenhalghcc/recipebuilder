@@ -596,7 +596,6 @@ class ProfileRecipeBuilder:
         modifier = self._choose_modifier(profile_items("modifier"), prefs["modifier_keywords"])
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
         sour = self._maybe_add_sour(profile, available_sours, prefs["needs_sour"])
-        vermouth_available = any(_is_vermouth(item) for item in profile_items("modifier"))
         family = family_override or self._select_family(profile, glass, responses, vermouth_available)
 
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]

@@ -566,34 +566,6 @@
       "neutral": false
     },
     {
-      "name": "Coffee Liqueur",
-      "category": "modifier",
-      "flavour_tags": [
-        "rich",
-        "indulgent"
-      ],
-      "profiles": [
-        "classic_boozy",
-        "dessert"
-      ],
-      "aromas": [
-        "earthy"
-      ],
-      "seasons": [
-        "winter"
-      ],
-      "spirits": [
-        "vodka",
-        "bourbon"
-      ],
-      "default_measure_ml": 25.0,
-      "role": "modifier",
-      "avoid_profiles": [
-        "citrus_fresh"
-      ],
-      "neutral": false
-    },
-    {
       "name": "Amaretto",
       "category": "modifier",
       "flavour_tags": [
