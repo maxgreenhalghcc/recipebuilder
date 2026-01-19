@@ -101,7 +101,7 @@ def test_generate_uses_session_identifiers(monkeypatch, client):
 
     data = response.get_json()
     assert captured["bar_id"] == "enchanted"
-    assert data["data"]["bar"] == "enchanted"
+    assert data["data"]["barId"] == "enchanted"
     assert data["data"]["sessionId"] == "session-123"
 
 
