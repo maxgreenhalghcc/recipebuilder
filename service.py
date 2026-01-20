@@ -4,6 +4,7 @@ from __future__ import annotations
 import collections
 import json
 import logging
+import re
 from collections import deque
 from pathlib import Path
 from typing import Any, Deque, Dict, FrozenSet, Hashable, Optional, Tuple
@@ -52,6 +53,173 @@ _ASSOCIATION_MODEL = _load_association_model()
 
 _RECENT_RECIPES: Dict[Tuple[str, Hashable], Deque[Tuple[FrozenSet[str], str, str]]] = collections.defaultdict(deque)
 _RECENT_LIMIT = 10
+
+# --- Measurement / alcohol normalisation (minimal "rogue catcher") ---
+_ML_PREFIX_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*ml\s+(.*)$", re.IGNORECASE)
+
+
+def _parse_ml_prefix(line: str) -> tuple[Optional[int], str]:
+    """
+    Returns (ml, rest). If no leading ml, returns (None, original line).
+    """
+    m = _ML_PREFIX_RE.match(line)
+    if not m:
+        return None, line
+    ml = int(round(float(m.group(1))))
+    rest = m.group(2).strip()
+    return ml, rest
+
+
+def _is_top_with_or_meta(line: str) -> bool:
+    lower = line.lower().strip()
+    return lower.startswith("top with") or lower.startswith("serve over") or lower.startswith("serve in") or lower.startswith("garnish:")
+
+
+def _role_from_tags(line: str) -> Optional[str]:
+    """
+    Uses your existing tags. Returns: modifier, sweetener, sour, juice, mixer or None.
+    """
+    lower = line.lower()
+    for tag in ("modifier", "sweetener", "sour", "juice", "mixer"):
+        if f"({tag})" in lower:
+            return tag
+    return None
+
+
+def _is_spirit_line(line: str) -> bool:
+    """
+    Spirits are usually untagged in your output (e.g., '45ml Vodka').
+    Treat any ml-line that is not tagged juice/sour/sweetener/mixer and not 'Top with/Serve/Garnish' as spirit.
+    """
+    if _is_top_with_or_meta(line):
+        return False
+    role = _role_from_tags(line)
+    if role in ("juice", "sour", "sweetener", "mixer"):
+        return False
+    if role == "modifier":
+        return False
+    return True
+
+
+def _snap_to_allowed(value: int, allowed: list[int]) -> int:
+    """
+    Snap to nearest allowed bucket (ties go to the smaller value).
+    """
+    allowed_sorted = sorted(allowed)
+    best = allowed_sorted[0]
+    best_dist = abs(value - best)
+    for a in allowed_sorted[1:]:
+        d = abs(value - a)
+        if d < best_dist or (d == best_dist and a < best):
+            best = a
+            best_dist = d
+    return best
+
+
+def _snap_to_step(value: int, step: int) -> int:
+    """
+    Snap to nearest multiple of step, never returning 0 if value > 0.
+    """
+    snapped = int(round(value / step) * step)
+    if value > 0 and snapped == 0:
+        return step
+    return snapped
+
+
+def normalise_measurements_and_cap_alcohol(ingredients: list[str]) -> list[str]:
+    """
+    Minimal post-processor:
+    - Spirits: snap to [25, 35, 50] (keeps common UK 35ml specs)
+    - Modifiers (liqueurs): snap to 5ml steps
+    - Juice/sour/sweetener: snap to 5ml steps
+    - Mixer/meta lines: untouched
+    - Enforce total alcohol (spirits + modifiers) <= 50ml by reducing modifiers first, then spirits.
+    """
+    recs: list[dict[str, Any]] = []
+    for line in ingredients:
+        ml, rest = _parse_ml_prefix(line)
+        recs.append({"line": line, "ml": ml, "rest": rest})
+
+    # 1) Snap measures
+    for r in recs:
+        ml = r["ml"]
+        if ml is None:
+            continue
+        line = r["line"]
+        if _is_top_with_or_meta(line):
+            continue
+
+        role = _role_from_tags(line)
+
+        if _is_spirit_line(line):
+            snapped = _snap_to_allowed(ml, [25, 35, 50])
+        elif role == "modifier":
+            snapped = _snap_to_step(ml, 5)
+        elif role in ("juice", "sour", "sweetener"):
+            snapped = _snap_to_step(ml, 5)
+        else:
+            snapped = _snap_to_step(ml, 5)
+
+        r["ml"] = snapped
+        r["line"] = f"{snapped}ml {r['rest']}"
+
+    # 2) Cap alcohol <= 50 (spirits + modifiers)
+    def is_alcohol(r: dict[str, Any]) -> bool:
+        if r["ml"] is None:
+            return False
+        if r["line"] is None:
+            return False
+        if _is_top_with_or_meta(r["line"]):
+            return False
+        role = _role_from_tags(r["line"])
+        return _is_spirit_line(r["line"]) or (role == "modifier")
+
+    def alcohol_total() -> int:
+        return int(sum(r["ml"] for r in recs if is_alcohol(r) and r["ml"] is not None))
+
+    if alcohol_total() <= 50:
+        return [r["line"] for r in recs if r["line"] is not None]
+
+    # Reduce modifiers first (in 5ml steps down to 0)
+    for r in recs:
+        if alcohol_total() <= 50:
+            break
+        if r["ml"] is None or r["line"] is None:
+            continue
+        if _role_from_tags(r["line"]) != "modifier":
+            continue
+        while r["ml"] > 0 and alcohol_total() > 50:
+            r["ml"] = max(0, r["ml"] - 5)
+            if r["ml"] == 0:
+                r["line"] = None
+                break
+            r["line"] = f"{r['ml']}ml {r['rest']}"
+
+    # Then reduce spirits (50 -> 35 -> 25 -> remove)
+    spirit_buckets = [50, 35, 25, 0]
+    for r in recs:
+        if alcohol_total() <= 50:
+            break
+        if r["ml"] is None or r["line"] is None:
+            continue
+        if not _is_spirit_line(r["line"]):
+            continue
+
+        current = r["ml"]
+        if current not in (25, 35, 50):
+            current = _snap_to_allowed(current, [25, 35, 50])
+
+        while alcohol_total() > 50 and current > 0:
+            idx = spirit_buckets.index(current)
+            current = spirit_buckets[idx + 1]  # next lower bucket
+            if current == 0:
+                r["ml"] = 0
+                r["line"] = None
+                break
+            r["ml"] = current
+            r["line"] = f"{current}ml {r['rest']}"
+
+    return [r["line"] for r in recs if r["line"] is not None]
 
 
 def _ingredient_signature(ingredients: list[str]) -> FrozenSet[str]:
@@ -130,6 +298,7 @@ def _format_ingredient_list(recipe) -> list[str]:
         items.append(f"Serve over {recipe.ice.lower()}")
     return items
 
+
 def _build_method_text(recipe) -> str:
     """Condense the method instructions into a readable paragraph."""
 
@@ -192,7 +361,7 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
 
     bar_id, session_id = _extract_bar_and_session(payload)
     logger.info("Received generation request for bar=%s session=%s", bar_id, session_id)
-    reserved_keys = {"bar","bar_id", "barId", "session", "session_id", "sessionId"}
+    reserved_keys = {"bar", "bar_id", "barId", "session", "session_id", "sessionId"}
     responses = _normalise_responses({key: value for key, value in payload.items() if key not in reserved_keys})
 
     try:
@@ -228,6 +397,9 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     rendered_candidates = []
     for cand in candidate_recipes:
         ingredients_list = _format_ingredient_list(cand)
+        # Minimal guardrails: snap measures + cap total alcohol <= 50ml (incl modifiers)
+        ingredients_list = normalise_measurements_and_cap_alcohol(ingredients_list)
+
         signature_recipe = {
             "body": {
                 "ingredients": ingredients_list,
