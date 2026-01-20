@@ -72,7 +72,12 @@ def _parse_ml_prefix(line: str) -> tuple[Optional[int], str]:
 
 def _is_top_with_or_meta(line: str) -> bool:
     lower = line.lower().strip()
-    return lower.startswith("top with") or lower.startswith("serve over") or lower.startswith("serve in") or lower.startswith("garnish:")
+    return (
+        lower.startswith("top with")
+        or lower.startswith("serve over")
+        or lower.startswith("serve in")
+        or lower.startswith("garnish:")
+    )
 
 
 def _role_from_tags(line: str) -> Optional[str]:
@@ -220,6 +225,148 @@ def normalise_measurements_and_cap_alcohol(ingredients: list[str]) -> list[str]:
             r["line"] = f"{current}ml {r['rest']}"
 
     return [r["line"] for r in recs if r["line"] is not None]
+
+
+# --- Candidate reranking + coherence fixes (minimal, taste-preserving) ---
+
+def _contains_any(haystack: str, needles: list[str]) -> bool:
+    h = haystack.lower()
+    return any(n.lower() in h for n in needles)
+
+
+def _ingredients_text(ingredients_list: list[str]) -> str:
+    return " | ".join(ingredients_list)
+
+
+def _has_top_with(ingredients_list: list[str]) -> bool:
+    return any(line.lower().strip().startswith("top with") for line in ingredients_list)
+
+
+def _has_serve_over_none(ingredients_list: list[str]) -> bool:
+    return any(line.lower().strip().startswith("serve over none") for line in ingredients_list)
+
+
+def _has_foaming_agent(ingredients_list: list[str]) -> bool:
+    txt = _ingredients_text(ingredients_list).lower()
+    return ("aquafaba" in txt) or ("egg white" in txt) or ("eggwhite" in txt)
+
+
+def _score_candidate(
+    bar_id: str,
+    cand,
+    ingredients_list: list[str],
+    responses_with_bar: Dict[str, Optional[str]],
+) -> float:
+    """
+    Soft scoring only: does NOT change what gets generated, only which of the already-generated
+    candidates we pick. This is where we fix "tonic bias", "martini + top-up" mismatches, and
+    floral preference for elderflower.
+    """
+    score = 0.0
+    txt = _ingredients_text(ingredients_list).lower()
+
+    bitterness = (responses_with_bar.get("bitterness_tolerance") or "").lower()
+    aroma = (responses_with_bar.get("aroma_preference") or "").lower()
+    season = (responses_with_bar.get("season") or "").lower()
+    house_type = (responses_with_bar.get("house_type") or "").lower()
+    dining_style = (responses_with_bar.get("dining_style") or "").lower()
+    foam_toggle = (responses_with_bar.get("foam_toggle") or "").lower()
+
+    # 1) Tonic usage: only good when bitterness is high (user instruction)
+    uses_tonic = "tonic" in txt and "top with" in txt
+    if uses_tonic:
+        if bitterness == "high":
+            score += 2.0
+        elif bitterness == "medium":
+            score -= 4.0
+        else:  # low/unknown
+            score -= 9.0
+
+    # 2) Serve coherence penalties: top-up drinks must not be martini/coupe and must have ice
+    glass = str(getattr(cand, "glassware", "") or "").lower()
+    if _has_top_with(ingredients_list):
+        if "martini" in glass or "coupe" in glass:
+            score -= 10.0
+        if _has_serve_over_none(ingredients_list):
+            score -= 7.0
+
+    # 3) Floral preference: strongly prefer elderflower when present
+    if aroma == "floral":
+        if "elderflower" in txt:
+            score += 6.0
+        # Peach schnapps often reads "random sweet lane" against floral/subtle briefs
+        if _contains_any(txt, ["archers", "peach schnapps"]):
+            score -= 3.0
+        # Tonic can read quinine/medicinal vs floral, unless bitterness was requested high
+        if "tonic" in txt and bitterness != "high":
+            score -= 2.0
+
+    # 4) Malibu/coconut appropriateness: penalise when not summer/tropical signalled
+    coconut_present = _contains_any(txt, ["malibu", "coconut syrup", "coconut rum"])
+    if coconut_present:
+        # Only "free" when clearly summer/beach/tropical vibes
+        summerish = (season == "summer") or ("beach" in house_type) or ("vibrant" in dining_style)
+        if not summerish:
+            score -= 4.0
+
+    # 5) "Subtle/fresh" brief: de-emphasise heavy sweet stacking
+    subtleish = ("subtle" in dining_style) or ("fresh" in dining_style) or ("freshness" in dining_style)
+    if subtleish:
+        if _contains_any(txt, ["simple syrup", "vanilla syrup", "caramel", "grenadine", "raspberry cordial"]):
+            score -= 2.0
+        if _contains_any(txt, ["orange juice", "pineapple juice"]) and "top with" in txt:
+            score -= 1.5
+
+    # 6) Foam toggle sanity: if foam requested, prefer candidates that include a foaming agent
+    if foam_toggle in ("yes", "true", "1"):
+        if _has_foaming_agent(ingredients_list):
+            score += 3.0
+        else:
+            score -= 3.0
+
+    # 7) Nut liqueur/allergen landmine (e.g., Frangelico) — soft penalty unless explicitly desired
+    if _contains_any(txt, ["frangelico", "hazelnut"]):
+        score -= 3.0
+
+    return score
+
+
+def _apply_serving_coherence(cand, ingredients_list: list[str], method_text: str) -> tuple[str, list[str], str]:
+    """
+    If a recipe has a top-up mixer, enforce that the serve format is coherent:
+    - avoid martini/coupe glassware for topped drinks
+    - ensure it is served over cubed ice (unless already specified)
+    - update method text to match chosen glass where possible
+    """
+    glass = str(getattr(cand, "glassware", "") or "").strip()
+    glass_lower = glass.lower()
+    has_top = _has_top_with(ingredients_list)
+
+    new_ingredients = list(ingredients_list)
+    new_method = method_text
+    new_glass = glass
+
+    if has_top:
+        # Force ice to cubed
+        found_serve_over = False
+        for i, line in enumerate(new_ingredients):
+            if line.lower().strip().startswith("serve over"):
+                found_serve_over = True
+                # Replace "none" with "cubed"
+                if line.lower().strip() == "serve over none":
+                    new_ingredients[i] = "Serve over cubed"
+                break
+        if not found_serve_over:
+            new_ingredients.append("Serve over cubed")
+
+        # If glass is martini/coupe and there's a top-up, switch to long glass
+        if "martini" in glass_lower or "coupe" in glass_lower:
+            new_glass = "long glass"
+            # Best-effort method text swap (keeps other steps intact)
+            new_method = new_method.replace("martini glass", "long glass").replace("Martini glass", "long glass")
+            new_method = new_method.replace("coupe", "long glass").replace("Coupe", "long glass")
+
+    return new_glass, new_ingredients, new_method
 
 
 def _ingredient_signature(ingredients: list[str]) -> FrozenSet[str]:
@@ -394,10 +541,11 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     if not candidate_recipes:
         return _json_error("Unable to generate a recipe with the provided stock.", 400)
 
-    rendered_candidates = []
+    # Render + normalise candidates, then pick the best one with soft preference scoring.
+    rendered_candidates: list[tuple[float, Any, list[str], dict[str, Any]]] = []
     for cand in candidate_recipes:
         ingredients_list = _format_ingredient_list(cand)
-        # Minimal guardrails: snap measures + cap total alcohol <= 50ml (incl modifiers)
+        # Guardrails: snap measures + cap total alcohol <= 50ml (incl modifiers)
         ingredients_list = normalise_measurements_and_cap_alcohol(ingredients_list)
 
         signature_recipe = {
@@ -407,20 +555,41 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
                 "garnish": cand.garnish or "",
             }
         }
-        rendered_candidates.append((cand, ingredients_list, signature_recipe))
 
-    chosen_tuple = next(
-        (
-            candidate
-            for candidate in rendered_candidates
-            if not _is_recent_duplicate(bar_id, session_id, candidate[2])
-        ),
-        rendered_candidates[0],
-    )
+        score = _score_candidate(bar_id, cand, ingredients_list, responses_with_bar)
+        rendered_candidates.append((score, cand, ingredients_list, signature_recipe))
 
-    recipe, ingredients_list, signature_recipe = chosen_tuple
+    # Prefer non-duplicate candidates; within that set, pick highest score.
+    non_dupes = [c for c in rendered_candidates if not _is_recent_duplicate(bar_id, session_id, c[3])]
+    pool = non_dupes if non_dupes else rendered_candidates
+    # Sort by score descending, but keep deterministic tie-break by original order (stable sort)
+    pool_sorted = sorted(pool, key=lambda x: x[0], reverse=True)
+    chosen_score, recipe, ingredients_list, signature_recipe = pool_sorted[0]
+
     method_text = _build_method_text(recipe)
     warnings = _collect_warnings(recipe)
+
+    # Apply final serve coherence (top-up drinks should not be martini/coupe, should have ice).
+    coerced_glassware, coerced_ingredients, coerced_method = _apply_serving_coherence(
+        recipe, ingredients_list, method_text
+    )
+
+    # If we coerced glassware/ingredients, update signature for memory + response payload.
+    ingredients_list = coerced_ingredients
+    method_text = coerced_method
+    signature_recipe = {
+        "body": {
+            "ingredients": ingredients_list,
+            "glassware": coerced_glassware,
+            "garnish": recipe.garnish or "",
+        }
+    }
+
+    # Optional helpful warning if tonic is used against low bitterness (doesn't change taste).
+    bitterness = (responses_with_bar.get("bitterness_tolerance") or "").lower()
+    if any(line.lower().startswith("top with") and "tonic" in line.lower() for line in ingredients_list) and bitterness != "high":
+        warnings.append("Tonic is typically best for higher bitterness preferences.")
+
     _remember_recipe(bar_id, session_id, signature_recipe)
 
     response_payload = {
@@ -432,7 +601,7 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
             "body": {
                 "ingredients": ingredients_list,
                 "method": method_text,
-                "glassware": recipe.glassware,
+                "glassware": coerced_glassware,
                 "garnish": recipe.garnish or "",
                 "warnings": warnings,
             },
@@ -445,3 +614,4 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint
     app.run(host="0.0.0.0", port=5000)
+
