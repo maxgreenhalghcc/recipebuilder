@@ -750,6 +750,17 @@ class ProfileRecipeBuilder:
         flavour_words = PROFILE_FLAVOUR_WORDS.get(profile, [])
         matching_syrups = [s for s in sweeteners if any(word in s.name.lower() for word in flavour_words)]
         neutral_syrups = [s for s in sweeteners if s not in matching_syrups]
+        # Floral: strongly prefer elderflower syrup/cordial when available
+        if profile == "floral":
+            floral_terms = ("elderflower", "st germain", "st-germain", "stgermain")
+            elderflower_syrups = [
+                s for s in sweeteners
+                if any(t in s.name.lower() for t in floral_terms)
+            ]
+            if elderflower_syrups:
+                # Put elderflower first, but keep other matches as fallback
+                matching_syrups = elderflower_syrups + [s for s in matching_syrups if s not in elderflower_syrups]
+                neutral_syrups = [s for s in neutral_syrups if s not in elderflower_syrups]
 
         flavoured_spirits: List[StockItem] = []
         if base_family:
