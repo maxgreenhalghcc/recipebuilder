@@ -417,6 +417,7 @@ class ProfileRecipeBuilder:
             profile_items("base"),
             abv_lane,
             rnd,
+            aroma_preference=responses.get("aroma_preference") or "",
         )
         aroma = (responses.get("aroma_preference") or "").strip().lower()
         
