@@ -467,20 +467,33 @@ class ProfileRecipeBuilder:
 
         spirit_extra = flavoured_ml if flavoured_spirit and flavoured_spirit.category == "spirit" else 0.0
         core_volume = base_ml + modifier_ml + sweet_ml + sour_ml + sum(juice_amounts) + spirit_extra
+        bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
+
+        mixer_keywords = list(prefs.get("mixer_keywords") or [])
+        
+        # Your rule: tonic only for high bitterness top-up
+        if bitterness == "high":
+            if "tonic" not in mixer_keywords:
+                mixer_keywords.append("tonic")
+        else:
+            mixer_keywords = [k for k in mixer_keywords if "tonic" not in k.lower()]
+        
+        mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
+
         mixer_item: Optional[StockItem] = None
         mixer_ml = 0.0
         if glass.sparkling:
-            mixer_item = self._select_mixer(profile_items("mixer"), prefs["mixer_keywords"], carbonation)
+            mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
             space = max(0.0, glass.capacity_ml - core_volume)
             target_min = 80.0 if carbonation.startswith("properly") else 40.0
             mixer_ml = min(max(space, target_min), max(space, glass.capacity_ml - core_volume + target_min)) if mixer_item else 0.0
         elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
-            mixer_item = self._select_mixer(profile_items("mixer"), prefs["mixer_keywords"], carbonation)
+            mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
             mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume)) if mixer_item else 0.0
 
         if carbonation.startswith("properly") and (mixer_item is None or not _is_mixer(mixer_item)):
             fallback_mixers = self.repository.neutral_items(role="mixer") + profile_items("mixer")
-            mixer_item = self._select_mixer(fallback_mixers, prefs["mixer_keywords"], carbonation)
+            mixer_item = self._select_mixer(fallback_mixers, mixer_keywords, carbonation)
             if mixer_item:
                 space = max(0.0, glass.capacity_ml - core_volume)
                 target_min = 80.0
@@ -976,8 +989,9 @@ class ProfileRecipeBuilder:
         if not mixers and not carbonation.startswith("properly"):
             return None
         target_keywords = list(keywords)
-        if "tonic" not in target_keywords and any("tonic" in m.name.lower() for m in mixers):
-            target_keywords.append("tonic")
+        # Don't auto-add tonic. Only select tonic when it's explicitly requested by keywords
+        # (keywords should be set upstream based on bitterness tolerance + carbonation).
+
         return _pick_first_matching(list(mixers), target_keywords) if mixers else None
 
     def _pick_garnish(self, garnishes: Sequence[StockItem], juices: Sequence[StockItem], keywords: Sequence[str]) -> str:
