@@ -235,6 +235,13 @@ def choose_profile(responses: Dict[str, Any]) -> str:
 
     return max(scores.items(), key=lambda kv: kv[1])[0]
 
+def _has_any_term(items: Sequence[StockItem], terms: Sequence[str]) -> bool:
+    terms_l = [t.lower() for t in terms]
+    for it in items:
+        name = (it.name or "").lower()
+        if any(t in name for t in terms_l):
+            return True
+    return False
 
 def _pick_first_matching(candidates: Sequence[StockItem], keywords: Iterable[str]) -> Optional[StockItem]:
     lowered = [kw.lower() for kw in keywords]
@@ -411,7 +418,31 @@ class ProfileRecipeBuilder:
             abv_lane,
             rnd,
         )
-        modifier = self._choose_modifier(profile_items("modifier"), prefs["modifier_keywords"])
+        aroma = (responses.get("aroma_preference") or "").strip().lower()
+        
+        modifier_keywords = list(prefs.get("modifier_keywords") or [])
+        sweetener_keywords = list(prefs.get("sweetener_keywords") or [])
+        
+        if aroma == "floral":
+            floral_terms = ("elderflower", "st germain", "st-germain", "stgermain")
+        
+            modifiers_pool = profile_items("modifier")
+            sweeteners_pool = profile_items("sweetener")
+        
+            # Prefer elderflower whether it's stocked as modifier or sweetener
+            if _has_any_term(modifiers_pool, floral_terms):
+                modifier_keywords = ["elderflower", "st germain"] + [
+                    k for k in modifier_keywords
+                    if "elder" not in k.lower() and "germain" not in k.lower()
+                ]
+        
+            if _has_any_term(sweeteners_pool, floral_terms):
+                sweetener_keywords = ["elderflower", "st germain"] + [
+                    k for k in sweetener_keywords
+                    if "elder" not in k.lower() and "germain" not in k.lower()
+                ]
+       
+        modifier = self._choose_modifier(profile_items("modifier"), modifier_keywords)
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
         sour = self._maybe_add_sour(profile, available_sours, prefs["needs_sour"])
 
