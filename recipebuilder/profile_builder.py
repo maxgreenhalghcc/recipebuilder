@@ -745,6 +745,7 @@ class ProfileRecipeBuilder:
         base_pool: Sequence[StockItem],
         abv_lane: str,
         rnd: random.Random,
+        aroma_preference: str = "",
     ) -> Tuple[Optional[StockItem], float, Optional[StockItem], float]:
         sweeteners = [s for s in sweeteners if not is_creamy(s)]
         flavour_words = PROFILE_FLAVOUR_WORDS.get(profile, [])
