@@ -752,7 +752,7 @@ class ProfileRecipeBuilder:
         matching_syrups = [s for s in sweeteners if any(word in s.name.lower() for word in flavour_words)]
         neutral_syrups = [s for s in sweeteners if s not in matching_syrups]
         # Floral: strongly prefer elderflower syrup/cordial when available
-        if profile == "floral":
+        if (aroma_preference or "").strip().lower() == "floral":
             floral_terms = ("elderflower", "st germain", "st-germain", "stgermain")
             elderflower_syrups = [
                 s for s in sweeteners
