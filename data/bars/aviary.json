@@ -408,20 +408,6 @@
       "role": "base",
       "neutral": false
     },
-
-    {
-      "name": "Monin White Chocolate Syrup",
-      "category": "syrup",
-      "flavour_tags": ["indulgent", "creamy"],
-      "profiles": ["dessert"],
-      "aromas": ["sweet"],
-      "seasons": ["winter"],
-      "spirits": ["vodka", "rum", "whiskey"],
-      "default_measure_ml": 15.0,
-      "role": "sweetener",
-      "avoid_profiles": ["citrus_fresh"],
-      "neutral": false
-    },
     {
       "name": "Monin Passionfruit Syrup",
       "category": "syrup",
