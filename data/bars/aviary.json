@@ -341,17 +341,6 @@
       "neutral": false
     },
     {
-      "name": "St-Germain Elderflower Liqueur",
-      "category": "modifier",
-      "flavour_tags": ["fresh", "floral"],
-      "profiles": ["berry", "citrus_fresh", "tropical"],
-      "aromas": ["floral"],
-      "seasons": ["spring"],
-      "default_measure_ml": 20.0,
-      "role": "modifier",
-      "neutral": false
-    },
-    {
       "name": "Limoncello",
       "category": "modifier",
       "flavour_tags": ["zesty", "vibrant"],
