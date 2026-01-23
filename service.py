@@ -227,6 +227,72 @@ def normalise_measurements_and_cap_alcohol(ingredients: list[str]) -> list[str]:
     return [r["line"] for r in recs if r["line"] is not None]
 
 
+def _merge_duplicate_alcohol_lines(ingredients: list[str]) -> list[str]:
+    """
+    Collapse duplicate alcohol lines like:
+      25ml Orange Gin
+      25ml Orange Gin
+    into:
+      50ml Orange Gin
+
+    Only merges identical alcohol items (spirits + modifiers). Never merges juices/sours/sweeteners/mixers,
+    and never touches 'Top with', 'Garnish:', or 'Serve over' lines.
+    """
+    # First pass: totals + first-seen display name + whether it was a modifier line
+    totals: dict[str, int] = {}
+    display: dict[str, str] = {}
+    is_modifier: dict[str, bool] = {}
+
+    def key_for(line: str) -> Optional[tuple[str, str, bool, int]]:
+        ml, rest = _parse_ml_prefix(line)
+        if ml is None:
+            return None
+        if _is_top_with_or_meta(line):
+            return None
+        role = _role_from_tags(line)
+        if role in ("juice", "sour", "sweetener", "mixer"):
+            return None
+        # Only spirits/modifiers (alcohol lanes)
+        if not (_is_spirit_line(line) or role == "modifier"):
+            return None
+
+        base_name = rest
+        base_name = re.sub(r"\s+\((?:modifier)\)\s*$", "", base_name, flags=re.IGNORECASE).strip()
+        k = base_name.lower()
+        return k, base_name, (role == "modifier"), ml
+
+    for line in ingredients:
+        info = key_for(line)
+        if info is None:
+            continue
+        k, base_name, mod, ml = info
+        totals[k] = totals.get(k, 0) + ml
+        if k not in display:
+            display[k] = base_name
+            is_modifier[k] = mod
+        else:
+            is_modifier[k] = is_modifier.get(k, False) or mod
+
+    # Second pass: emit merged line on first encounter, skip subsequent duplicates
+    emitted: set[str] = set()
+    out: list[str] = []
+    for line in ingredients:
+        info = key_for(line)
+        if info is None:
+            out.append(line)
+            continue
+        k, _, _, _ = info
+        if k in emitted:
+            continue
+        emitted.add(k)
+        total_ml = totals.get(k, 0)
+        name = display.get(k, "")
+        suffix = " (modifier)" if is_modifier.get(k, False) else ""
+        out.append(f"{int(total_ml)}ml {name}{suffix}")
+
+    return out
+
+
 # --- Candidate reranking + coherence fixes (minimal, taste-preserving) ---
 
 def _contains_any(haystack: str, needles: list[str]) -> bool:
@@ -577,6 +643,10 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     # If we coerced glassware/ingredients, update signature for memory + response payload.
     ingredients_list = coerced_ingredients
     method_text = coerced_method
+
+    # Collapse duplicate alcohol lines (e.g., 25ml Orange Gin + 25ml Orange Gin -> 50ml Orange Gin).
+    ingredients_list = _merge_duplicate_alcohol_lines(ingredients_list)
+
     signature_recipe = {
         "body": {
             "ingredients": ingredients_list,
@@ -614,4 +684,5 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint
     app.run(host="0.0.0.0", port=5000)
+
 
