@@ -661,7 +661,7 @@
       "name": "Apple Juice",
       "category": "juice",
       "flavour_tags": ["fresh", "crisp"],
-      "profiles": ["citrus_fresh", "tropical"],
+      "profiles": ["citrus_fresh"],
       "aromas": ["fruity"],
       "seasons": ["spring", "summer"],
       "spirits": ["vodka", "rum", "gin"],
