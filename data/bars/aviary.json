@@ -538,7 +538,7 @@
       "name": "Lime Cordial",
       "category": "syrup",
       "flavour_tags": ["zesty", "fresh"],
-      "profiles": ["citrus_fresh", "tropical"],
+      "profiles": ["citrus_fresh"],
       "aromas": ["citrus"],
       "seasons": ["summer"],
       "spirits": ["gin", "vodka", "rum", "tequila"],
