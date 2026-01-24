@@ -409,6 +409,12 @@ class ProfileRecipeBuilder:
 
         juice_pool = profile_items("juice")
         core_juices = [i for i in juice_pool if _is_core_juice(i)]
+        # Keep gin + citrus_fresh sharp: avoid pineapple juice in this lane
+        base_spirit = (responses.get("base_spirit") or "").lower()
+        aroma = (responses.get("aroma_preference") or "").strip().lower()
+        sweet_style = (responses.get("sweetener_question") or "").strip().lower()
+        if base_spirit == "gin" and profile == "citrus_fresh" and ("citrus" in aroma or "zesty" in sweet_style):
+            core_juices = [j for j in core_juices if "pineapple" not in j.name.lower()]
         juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=2)
         sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
             profile,
@@ -1086,19 +1092,29 @@ class ProfileRecipeBuilder:
         choices = list(garnishes)
         if not choices:
             return ""
-    
-        # 1) Juice-driven garnish (only if an actual match exists)
+            
+        # 1) Juice-driven garnish with priority (pineapple beats orange when both present)
         if juices:
-            juice_tokens = set()
-            for j in juices:
-                for tok in (j.name or "").lower().replace("&", " ").replace("-", " ").split():
-                    if tok:
-                        juice_tokens.add(tok)
-    
-            for cand in choices:
-                name = cand.name.lower()
-                if any(tok in name for tok in juice_tokens):
-                    return cand.name
+            juice_text = " ".join((j.name or "").lower() for j in juices)
+        
+            priority = []
+            if "pineapple" in juice_text:
+                priority.append("pineapple")
+            if "passion" in juice_text:
+                priority.append("passion")
+            if "orange" in juice_text:
+                priority.append("orange")
+            if "cranberry" in juice_text:
+                priority.append("cranberry")
+            if "lime" in juice_text:
+                priority.append("lime")
+            if "lemon" in juice_text:
+                priority.append("lemon")
+        
+            for want in priority:
+                for cand in choices:
+                    if want in cand.name.lower():
+                        return cand.name
     
         # 2) Keyword-driven garnish (only if an actual match exists)
         lowered_keywords = [k.lower() for k in (keywords or []) if k]
