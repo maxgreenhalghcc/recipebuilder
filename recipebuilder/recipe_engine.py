@@ -337,9 +337,9 @@ def _apply_variety_pass_to_profile_recipe(
 
 def _apply_serving_style_pass(recipe: object, *, responses: Dict[str, Optional[str]]) -> None:
     """
-    Cosmetic-only pass (owner-facing fixes):
-    - Reduce "only long glasses" by switching to gin glass for gin+tonic.
-    - Reduce "only orange garnishes" by switching to pineapple garnish when pineapple is present.
+    Cosmetic-only pass:
+    - Adds controlled glassware variety while respecting house_type profiling.
+    - Fixes owner pain points: gin+tonic -> gin glass, and orange garnish -> pineapple when pineapple present.
     Does NOT change ingredients or amounts.
     """
     if not hasattr(recipe, "glassware") or not hasattr(recipe, "ingredients"):
@@ -348,11 +348,10 @@ def _apply_serving_style_pass(recipe: object, *, responses: Dict[str, Optional[s
     ings = getattr(recipe, "ingredients", []) or []
     names = " ".join(_normalize(getattr(getattr(s, "ingredient", None), "name", "")) for s in ings)
 
-    # Read current fields
-    glass = _normalize(str(getattr(recipe, "glassware", "") or ""))
     base = _normalize(str(responses.get("base_spirit") or ""))
     carbonation = _normalize(str(responses.get("carbonation_texture") or ""))
     music = _normalize(str(responses.get("music_preference") or ""))
+    house = _normalize(str(responses.get("house_type") or ""))
     current_garnish = _normalize(str(getattr(recipe, "garnish", "") or ""))
 
     # deterministic-ish randomness per request (uses provided seed if present)
@@ -363,31 +362,70 @@ def _apply_serving_style_pass(recipe: object, *, responses: Dict[str, Optional[s
         seed = None
     rng = random.Random(seed if seed is not None else time.time_ns() & 0xFFFFFFFF)
 
-    # --- Glassware fixes ---
-    # Only intervene when it's a long glass/highball style
-    if ("long glass" in glass) or ("highball" in glass):
-        # Robust tonic detection (covers "Top with Tonic Water (Slimline)" etc.)
+    # --- House-type base mapping (your profiling points) ---
+    def _base_glass_for_house(h: str) -> str:
+        if "haunted" in h:
+            return "skull glass"
+        if "modern" in h:
+            return "martini glass"
+        if "tree" in h:
+            return "gin glass"
+        if "beach" in h:
+            return "long glass"
+        return "long glass"
+
+    base_glass = _base_glass_for_house(house)
+
+    # --- Controlled variety (small, safe alternates) ---
+    # We keep the base mapping most of the time, but allow alternates to avoid monotony.
+    # Haunted house stays skull glass always.
+    if "haunted" not in house:
+        # Ingredient-driven flags
         has_tonic = ("tonic" in names) or ("top with tonic" in names)
+        has_soda = ("soda water" in names) or ("top with soda" in names)
+        has_lemonade = ("lemonade" in names) or ("top with lemonade" in names)
 
-        # Owner pain point: gin + tonic should look like a G&T
+        # Start with base glass most of the time
+        pick = base_glass
+
         if base == "gin" and has_tonic:
-            recipe.glassware = "gin glass"
+            # Owner expectation: G&T should be in a gin glass
+            pick = "gin glass"
         else:
-            # very light variety: sometimes swap to a safe alt glass (kept conservative)
-            if rng.random() < 0.30:
-                if "jazz" in music and carbonation in {"still & silky", ""}:
-                    recipe.glassware = "chilled coupe"
-                elif ("dark rum" in names) or ("spiced rum" in names) or ("whiskey" in names):
-                    recipe.glassware = "rocks glass"
-                else:
-                    recipe.glassware = "gin glass"
+            r = rng.random()
 
-    # --- Garnish fixes ---
-    # If the build contains pineapple (juice or garnish item), stop defaulting to orange garnish.
+            if base_glass == "long glass":
+                # beach house tends to dominate, so give it the most variety
+                if r < 0.70:
+                    pick = "long glass"
+                elif r < 0.85:
+                    pick = "gin glass"  # still fine for fizzy serves
+                else:
+                    pick = "chilled coupe" if carbonation in {"still & silky", ""} else "rocks glass"
+
+            elif base_glass == "martini glass":
+                # modern house: mostly martini, sometimes coupe/nick&nora
+                if r < 0.80:
+                    pick = "martini glass"
+                else:
+                    pick = "chilled coupe"
+
+            elif base_glass == "gin glass":
+                # tree house: mostly gin glass, sometimes rocks for woody/darker vibe
+                if r < 0.80:
+                    pick = "gin glass"
+                else:
+                    pick = "rocks glass"
+
+        # Apply (only if recipe currently looks generic long/highball-ish OR empty)
+        current_glass = _normalize(str(getattr(recipe, "glassware", "") or ""))
+        if (not current_glass) or ("long glass" in current_glass) or ("highball" in current_glass):
+            recipe.glassware = pick
+
+    # --- Garnish fix: pineapple beats orange when pineapple is already in the build ---
     has_pineapple = "pineapple" in names
-    if has_pineapple:
-        if current_garnish in {"oranges", "orange", "orange slice", "oranges "} or "orange" in current_garnish:
-            recipe.garnish = "Pineapple"
+    if has_pineapple and ("orange" in current_garnish):
+        recipe.garnish = "Pineapple"
 
 
 def _coerce_string_list(value: Optional[object]) -> List[str]:
