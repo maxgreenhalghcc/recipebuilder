@@ -117,11 +117,8 @@ def _apply_variety_pass_to_profile_recipe(
     association_model: Optional["FlavourAssociationModel"] = None,
 ) -> None:
     """
-    Post-pass that increases variety without rewriting the builder.
-    Goals (safe + "wow"):
-    - Keep bartender-friendly structure/ratios (no amount changes).
-    - Improve perceived personalization by steering swaps to match the guest's vibe.
-    - Avoid the "squash loop" (lime cordial + citrus juice/sour every time).
+    Post-pass to increase 'wow' personalization safely.
+    Key change: prioritize taste-impacting swaps (sweetener/modifier) BEFORE garnish.
     """
     if not hasattr(recipe, "ingredients"):
         return
@@ -129,7 +126,6 @@ def _apply_variety_pass_to_profile_recipe(
     if not isinstance(suggestions, list) or not suggestions:
         return
 
-    # Build scoring context (reuse existing scoring + guardrails)
     plan = build_preference_plan(responses)
     profile = collect_profile_tags(responses, plan)
 
@@ -151,9 +147,6 @@ def _apply_variety_pass_to_profile_recipe(
     rng = random.Random(time.time_ns() & 0xFFFFFFFF)
     temp = _variety_temperature()
 
-    # -----------------------------
-    # "Vibe" detection (realistic)
-    # -----------------------------
     def _norm_resp(key: str) -> str:
         return _normalize(str(responses.get(key) or ""))
 
@@ -163,15 +156,13 @@ def _apply_variety_pass_to_profile_recipe(
     bitterness = _norm_resp("bitterness_tolerance")
     dining = _norm_resp("dining_style")
 
-    # Loose heuristics: match how humans answer (keep it broad and forgiving)
     is_candy = any(x in sweet_q for x in ("candy", "fun")) or "pop" in music
-    is_floral = "floral" in aroma or "elderflower" in sweet_q or "violet" in sweet_q
+    is_floral = "floral" in aroma
     is_berry = "berry" in sweet_q or "berry" in aroma
     is_classic = ("classic" in sweet_q) or ("jazz" in music) or ("fine dining" in dining)
-    is_bitter_high = any(x in bitterness for x in ("high", "strong"))  # tolerant
-    is_citrus = "citrus" in aroma or "zesty" in sweet_q
+    is_bitter_high = any(x in bitterness for x in ("high", "strong"))
+    is_citrus = ("citrus" in aroma) or ("zesty" in sweet_q)
 
-    # Current build detection (to avoid squash loop)
     def _has_name(substr: str) -> bool:
         s = substr.lower()
         for sug in suggestions:
@@ -181,44 +172,36 @@ def _apply_variety_pass_to_profile_recipe(
         return False
 
     has_lime_cordial = _has_name("lime cordial")
-    has_citrus_sour = _has_name("funkin lime") or _has_name("funkin lemon") or _has_name("lime juice") or _has_name("lemon juice")
+    has_citrus_sour = _has_name("funkin lime") or _has_name("funkin lemon")
+    squash_loop = has_lime_cordial and has_citrus_sour
 
-    # If we're already in "lime cordial + citrus sour" land, we try harder to swap sweetener away from cordial.
-    avoid_lime_cordial_this_pass = has_lime_cordial and has_citrus_sour and not is_citrus
+    SWEETENER_PREFER: Set[str] = set()
+    SWEETENER_AVOID: Set[str] = set()
+    MODIFIER_PREFER: Set[str] = set()
+    MODIFIER_AVOID: Set[str] = set()
+    GARNISH_PREFER: Set[str] = set()
 
-    # -----------------------------
-    # Preference keyword filters
-    # -----------------------------
-    SWEETENER_PREFER = set()
-    SWEETENER_AVOID = set()
-    MODIFIER_PREFER = set()
-    MODIFIER_AVOID = set()
-    GARNISH_PREFER = set()
-
-    # Colour + identity drivers
     if is_berry:
         SWEETENER_PREFER.update({"grenadine", "raspberry", "blackberry", "cherry", "blackcurrant"})
-        GARNISH_PREFER.update({"raspberries", "maraschino", "cherries"})
+        GARNISH_PREFER.update({"raspberries", "cherries", "maraschino"})
     if is_floral:
         SWEETENER_PREFER.update({"elderflower", "violet"})
-        GARNISH_PREFER.update({"lemon", "lime"})  # floral + citrus reads clean
+        GARNISH_PREFER.update({"lemon", "lime", "mint"})
     if is_candy:
         SWEETENER_PREFER.update({"bubblegum", "watermelon", "melon", "lychee", "kiwi"})
         MODIFIER_PREFER.update({"midori", "archers", "blue cura", "limoncello", "passoa"})
-        GARNISH_PREFER.update({"pineapple", "raspberries", "mint"})
+        GARNISH_PREFER.update({"pineapple", "mint", "raspberries"})
     if is_classic:
-        # Keep classic, but avoid throwing vermouth into "squash" builds
-        MODIFIER_PREFER.update({"cointreau", "vermouth", "cherry heering"})
-        if not is_bitter_high:
+        MODIFIER_PREFER.update({"cointreau", "cherry heering"})
+        if is_bitter_high:
+            MODIFIER_PREFER.add("vermouth")
+        else:
             MODIFIER_AVOID.add("vermouth")
 
-    if avoid_lime_cordial_this_pass:
+    # If we're in the squash loop and the user isn't explicitly citrus/zesty,
+    # force the sweetener away from lime cordial.
+    if squash_loop and not is_citrus:
         SWEETENER_AVOID.add("lime cordial")
-
-    # If they're explicitly citrus/zesty, cordial is allowed, but we still want variety:
-    if is_citrus and not avoid_lime_cordial_this_pass:
-        # keep as neutral, don't force it
-        pass
 
     def _matches_any(name: str, keywords: Set[str]) -> bool:
         if not keywords:
@@ -226,9 +209,6 @@ def _apply_variety_pass_to_profile_recipe(
         n = _normalize(name)
         return any(k in n for k in keywords if k)
 
-    # -----------------------------
-    # Swap engine (safe, role-based)
-    # -----------------------------
     def _swap_role(
         role: str,
         *,
@@ -237,6 +217,7 @@ def _apply_variety_pass_to_profile_recipe(
         min_ratio: float,
         prefer_keywords: Optional[Set[str]] = None,
         avoid_keywords: Optional[Set[str]] = None,
+        force: bool = False,
     ) -> bool:
         nonlocal existing_tags, used_names
 
@@ -250,7 +231,7 @@ def _apply_variety_pass_to_profile_recipe(
         if current_idx is None or current_ing is None:
             return False
 
-        if rng.random() > chance:
+        if (not force) and (rng.random() > chance):
             return False
 
         current_name = _normalize(getattr(current_ing, "name", ""))
@@ -262,23 +243,15 @@ def _apply_variety_pass_to_profile_recipe(
             name = _normalize(getattr(item, "name", ""))
             if not name or name == current_name or name in used_names:
                 continue
-
-            # dessert-only guardrail
             if getattr(item, "dessert_only", False) and _normalize(profile_name) != "dessert":
                 continue
-
-            # optional avoids
-            if avoid_keywords and not _matches_any(name, set()):  # no-op guard
-                pass
             if avoid_keywords and any(k in name for k in avoid_keywords if k):
                 continue
-
             pool.append(item)
 
         if not pool:
             return False
 
-        # If we have a preference filter, try it first (but fall back if empty)
         filtered_pool = pool
         if prefer_keywords:
             preferred = [it for it in pool if _matches_any(getattr(it, "name", ""), prefer_keywords)]
@@ -307,12 +280,11 @@ def _apply_variety_pass_to_profile_recipe(
         if chosen is None:
             return False
 
-        # Final safety: avoid swapping IN lime cordial when we explicitly want out
-        if role == "sweetener" and avoid_lime_cordial_this_pass:
+        # Extra guard: don't swap INTO lime cordial when we're avoiding it
+        if role == "sweetener" and avoid_keywords and "lime cordial" in avoid_keywords:
             if "lime cordial" in _normalize(getattr(chosen, "name", "")):
                 return False
 
-        # swap ingredient only (keep amount)
         suggestions[current_idx].ingredient = chosen  # type: ignore[attr-defined]
         used_names.add(_normalize(getattr(chosen, "name", "")))
         existing_tags = _collect_tags(suggestions)
@@ -326,44 +298,42 @@ def _apply_variety_pass_to_profile_recipe(
         return True
 
     # -----------------------------
-    # Execution order (max impact)
+    # NEW ORDER: taste first
     # -----------------------------
-    # 1) Garnish: most visible, also fixes "only oranges" perception
-    garnish_prefer = GARNISH_PREFER if GARNISH_PREFER else None
-    swapped = _swap_role(
-        "garnish",
+
+    # 1) Sweetener swap (biggest "wow" + colour driver)
+    sweet_force = bool(SWEETENER_AVOID)  # squash loop forces
+    swapped_sweet = _swap_role(
+        "sweetener",
         chance=0.85,
         k=6,
-        min_ratio=0.70,
-        prefer_keywords=garnish_prefer,
-        avoid_keywords={"oranges"} if ("pineapple" in (garnish_prefer or set())) else None,
+        min_ratio=0.72,
+        prefer_keywords=(SWEETENER_PREFER if SWEETENER_PREFER else None),
+        avoid_keywords=(SWEETENER_AVOID if SWEETENER_AVOID else None),
+        force=sweet_force,
     )
 
-    # 2) Sweetener: biggest taste identity + colour driver
-    if not swapped:
-        sweet_prefer = SWEETENER_PREFER if SWEETENER_PREFER else None
-        sweet_avoid = set(SWEETENER_AVOID) if SWEETENER_AVOID else None
-        swapped = _swap_role(
-            "sweetener",
-            chance=0.70,     # increased (sweetener is the "wow" lever)
-            k=5,
-            min_ratio=0.74,
-            prefer_keywords=sweet_prefer,
-            avoid_keywords=sweet_avoid,
-        )
+    # 2) Modifier swap (identity)
+    _swap_role(
+        "modifier",
+        chance=0.55 if (is_candy or is_berry) else 0.40,
+        k=5,
+        min_ratio=0.76,
+        prefer_keywords=(MODIFIER_PREFER if MODIFIER_PREFER else None),
+        avoid_keywords=(MODIFIER_AVOID if MODIFIER_AVOID else None),
+        force=False,
+    )
 
-    # 3) Modifier: inventiveness, but keep slightly tighter to avoid "random weird"
-    if not swapped:
-        mod_prefer = MODIFIER_PREFER if MODIFIER_PREFER else None
-        mod_avoid = set(MODIFIER_AVOID) if MODIFIER_AVOID else None
-        _swap_role(
-            "modifier",
-            chance=0.45,
-            k=4,
-            min_ratio=0.78,
-            prefer_keywords=mod_prefer,
-            avoid_keywords=mod_avoid,
-        )
+    # 3) Garnish swap (cosmetic, do last)
+    _swap_role(
+        "garnish",
+        chance=0.65,
+        k=6,
+        min_ratio=0.70,
+        prefer_keywords=(GARNISH_PREFER if GARNISH_PREFER else None),
+        avoid_keywords=None,
+        force=False,
+    )
 
 
 
