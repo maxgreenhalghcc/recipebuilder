@@ -2981,12 +2981,60 @@ def generate_cocktail_recipe(
 
     repository.prime_cache(bar_id)
     builder = ProfileRecipeBuilder(repository)
-    recipe = builder.build_recipe(responses_with_bar, profile_name)
+
+    # Build a few candidates and choose the most "service-ready" one (safe fallback)
+    seed_raw = responses_with_bar.get("seed")
+    try:
+        seed_i = int(seed_raw) if seed_raw is not None else None
+    except (TypeError, ValueError):
+        seed_i = None
+
+    candidates = []
+    try:
+        candidates = builder.build_candidates(
+            responses_with_bar,
+            profile_name,
+            seed=seed_i,
+            num_candidates=3,
+            max_attempts=8,
+        ) or []
+    except Exception:
+        # Never break service because candidate generation failed
+        logger.exception("Candidate build failed; falling back to single recipe.")
+        candidates = []
+
+    def _score_candidate(r):
+        ings = getattr(r, "ingredients", None) or []
+        roles = [getattr(s, "role", "").lower() for s in ings]
+        n = len(ings)
+
+        has_juice = "juice" in roles
+        has_sour = "sour" in roles
+        has_mixer = "mixer" in roles
+
+        # Prefer: (1) fuller recipes, (2) real structure, (3) sour/mixer presence, (4) component count
+        return (
+            1 if n >= 6 else 0,
+            1 if (has_juice and (has_sour or has_mixer)) else 0,
+            1 if has_sour else 0,
+            1 if has_mixer else 0,
+            n,
+        )
+
+    try:
+        recipe = max(candidates, key=_score_candidate) if candidates else None
+    except Exception:
+        logger.exception("Candidate scoring failed; falling back to single recipe.")
+        recipe = None
+
+    if recipe is None:
+        # Absolute fallback path (always works)
+        recipe = builder.build_recipe(responses_with_bar, profile_name)
+
     try:
         _apply_serving_style_pass(recipe, responses=responses_with_bar)
     except Exception:
         logger.exception("Serving style pass failed; leaving glassware/garnish unchanged.")
-
 
     # Safe, minimal variety layer (Aviary-only by default, or enable via VARIETY_LAYER=1)
     if _variety_enabled_for_bar(bar_id):
