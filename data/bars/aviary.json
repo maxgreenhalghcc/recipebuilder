@@ -550,7 +550,7 @@
     {
       "name": "Elderflower Cordial",
       "category": "syrup",
-      "flavour_tags": ["fresh", "floral"],
+      "flavour_tags": ["fresh", "floral", "zesty"],
       "profiles": ["berry", "citrus_fresh", "classic_boozy", "tropical"],
       "aromas": ["floral"],
       "seasons": ["spring"],
