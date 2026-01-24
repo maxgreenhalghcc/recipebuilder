@@ -336,19 +336,24 @@ def _apply_variety_pass_to_profile_recipe(
     )
 
 def _apply_serving_style_pass(recipe: object, *, responses: Dict[str, Optional[str]]) -> None:
+    """
+    Cosmetic-only pass (owner-facing fixes):
+    - Reduce "only long glasses" by switching to gin glass for gin+tonic.
+    - Reduce "only orange garnishes" by switching to pineapple garnish when pineapple is present.
+    Does NOT change ingredients or amounts.
+    """
     if not hasattr(recipe, "glassware") or not hasattr(recipe, "ingredients"):
         return
 
-    glass = _normalize(str(getattr(recipe, "glassware", "") or ""))
-    if "long glass" not in glass:
-        return  # don't touch non-long outputs
+    ings = getattr(recipe, "ingredients", []) or []
+    names = " ".join(_normalize(getattr(getattr(s, "ingredient", None), "name", "")) for s in ings)
 
+    # Read current fields
+    glass = _normalize(str(getattr(recipe, "glassware", "") or ""))
     base = _normalize(str(responses.get("base_spirit") or ""))
     carbonation = _normalize(str(responses.get("carbonation_texture") or ""))
     music = _normalize(str(responses.get("music_preference") or ""))
-
-    ings = getattr(recipe, "ingredients", []) or []
-    names = " ".join(_normalize(getattr(getattr(s, "ingredient", None), "name", "")) for s in ings)
+    current_garnish = _normalize(str(getattr(recipe, "garnish", "") or ""))
 
     # deterministic-ish randomness per request (uses provided seed if present)
     seed_raw = responses.get("seed")
@@ -358,19 +363,31 @@ def _apply_serving_style_pass(recipe: object, *, responses: Dict[str, Optional[s
         seed = None
     rng = random.Random(seed if seed is not None else time.time_ns() & 0xFFFFFFFF)
 
-    # hard sensible override: gin + tonic => gin glass
-    if base == "gin" and "tonic water" in names:
-        recipe.glassware = "gin glass"
-        return
+    # --- Glassware fixes ---
+    # Only intervene when it's a long glass/highball style
+    if ("long glass" in glass) or ("highball" in glass):
+        # Robust tonic detection (covers "Top with Tonic Water (Slimline)" etc.)
+        has_tonic = ("tonic" in names) or ("top with tonic" in names)
 
-    # very light variety to satisfy owner: 30% of the time, pick a safe alternative
-    if rng.random() < 0.30:
-        if "jazz" in music and carbonation in {"still & silky", ""}:
-            recipe.glassware = "chilled coupe"
-        elif "dark rum" in names or "spiced rum" in names:
-            recipe.glassware = "rocks glass"
-        else:
+        # Owner pain point: gin + tonic should look like a G&T
+        if base == "gin" and has_tonic:
             recipe.glassware = "gin glass"
+        else:
+            # very light variety: sometimes swap to a safe alt glass (kept conservative)
+            if rng.random() < 0.30:
+                if "jazz" in music and carbonation in {"still & silky", ""}:
+                    recipe.glassware = "chilled coupe"
+                elif ("dark rum" in names) or ("spiced rum" in names) or ("whiskey" in names):
+                    recipe.glassware = "rocks glass"
+                else:
+                    recipe.glassware = "gin glass"
+
+    # --- Garnish fixes ---
+    # If the build contains pineapple (juice or garnish item), stop defaulting to orange garnish.
+    has_pineapple = "pineapple" in names
+    if has_pineapple:
+        if current_garnish in {"oranges", "orange", "orange slice", "oranges "} or "orange" in current_garnish:
+            recipe.garnish = "Pineapple"
 
 
 def _coerce_string_list(value: Optional[object]) -> List[str]:
