@@ -557,6 +557,17 @@ class ProfileRecipeBuilder:
         if mixer_item and mixer_ml > 0:
             suggestions.append(IngredientSuggestion(mixer_item, mixer_ml, "mixer"))
 
+        # MINIMUM VIABLE COCKTAIL GUARDRAIL:
+        # If we ended up with no juice and no sour, add a core juice so we never serve a 3-ingredient "spiked mixer".
+        has_juice = any(s.role == "juice" for s in suggestions)
+        has_sour = any(s.role == "sour" for s in suggestions)
+        if (not has_juice) and (not has_sour):
+            fallback_pool = self.repository.neutral_items(role="juice") + profile_items("juice")
+            fallback = _pick_first_matching(fallback_pool, ["orange", "apple", "cranberry"])
+            if fallback:
+                suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
+
+
         garnish = self._pick_garnish(self.repository.items_for_profile(profile, role="garnish"), juices, prefs["garnish_keywords"])
         steps = self._build_steps(glass.name, mixer_item.name if mixer_item else None)
 
