@@ -1004,6 +1004,7 @@ class ProfileRecipeBuilder:
                 if pool:
                     juices = juices[:1] + [pool[0]] if juices else [pool[0]]
                     adjusted_amounts = adjusted_amounts[:1] + [max(25.0, adjusted_amounts[0] if adjusted_amounts else 25.0)]
+                    
 
         return juices, adjusted_amounts, sour_ml
 
@@ -1107,8 +1108,8 @@ class ProfileRecipeBuilder:
                 if any(k in name for k in lowered_keywords):
                     return cand.name
 
-    # 3) Last resort fallback
-    return choices[0].name
+        # 3) Last resort fallback
+        return choices[0].name
 
 
     def _build_steps(self, glass: str, mixer: Optional[str]) -> List[str]:
