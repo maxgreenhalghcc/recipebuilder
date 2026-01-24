@@ -10,6 +10,10 @@ from statistics import mean
 from typing import Dict, Iterable, List, Literal, Optional, Sequence, Set, Tuple
 import json
 import re
+import os
+import random
+import time
+
 
 from recipebuilder.preferences import PreferencePlan, build_preference_plan, collect_profile_tags
 from recipebuilder.flavour_context import (
@@ -22,6 +26,207 @@ from recipebuilder.flavour_context import (
 
 
 logger = logging.getLogger(__name__)
+
+# -----------------------------
+# Variety layer (safe, minimal)
+# -----------------------------
+def _variety_enabled_for_bar(bar_id: str) -> bool:
+    """
+    Safety-first rollout:
+    - Enabled for Aviary by default (tight blast radius)
+    - Or globally via env VARIETY_LAYER=1
+    """
+    flag = os.getenv("VARIETY_LAYER", "0").strip()
+    if flag == "1":
+        return True
+    return _normalize(bar_id) in {"aviary"}
+
+
+def _variety_temperature() -> float:
+    """Lower = safer (more like argmax)."""
+    try:
+        value = float(os.getenv("VARIETY_TEMP", "0.75"))
+    except (TypeError, ValueError):
+        value = 0.75
+    return max(0.25, min(1.5, value))
+
+
+def _weighted_choice_from_ranked(
+    ranked: Sequence[Tuple["Ingredient", float]],
+    *,
+    rng: random.Random,
+    k: int = 4,
+    min_score_ratio: float = 0.75,
+    temperature: float = 0.75,
+) -> Optional["Ingredient"]:
+    """
+    Pick from top-k with guardrails:
+    - only items within min_score_ratio of best score
+    - weighted by score^(1/temperature)
+    """
+    if not ranked:
+        return None
+
+    top = ranked[0][1]
+    try:
+        top = float(top)
+    except (TypeError, ValueError):
+        return ranked[0][0]
+
+    if top <= 0:
+        return ranked[0][0]
+
+    cutoff = top * float(min_score_ratio)
+    shortlist: List[Tuple["Ingredient", float]] = []
+    for ing, score in ranked[: max(1, int(k))]:
+        try:
+            s = float(score)
+        except (TypeError, ValueError):
+            continue
+        if s >= cutoff:
+            shortlist.append((ing, s))
+
+    if not shortlist:
+        return ranked[0][0]
+
+    temp = max(0.25, float(temperature))
+    weights: List[float] = []
+    for _, s in shortlist:
+        weights.append(max(1e-6, s) ** (1.0 / temp))
+
+    total = sum(weights)
+    if total <= 0:
+        return shortlist[0][0]
+
+    pick = rng.random() * total
+    running = 0.0
+    for (ing, _), w in zip(shortlist, weights):
+        running += w
+        if pick <= running:
+            return ing
+    return shortlist[-1][0]
+
+
+def _apply_variety_pass_to_profile_recipe(
+    recipe: object,
+    *,
+    repository: "StockRepository",
+    bar_id: str,
+    responses: Dict[str, Optional[str]],
+    profile_name: str,
+    association_model: Optional["FlavourAssociationModel"] = None,
+) -> None:
+    """
+    Post-pass that increases variety without rewriting the builder:
+    - Optionally swaps ONE of: garnish, sweetener, modifier
+    - Keeps amounts the same (low risk)
+    - Only picks near-top candidates using existing scoring
+    """
+    if not hasattr(recipe, "ingredients"):
+        return
+    suggestions = getattr(recipe, "ingredients", None)
+    if not isinstance(suggestions, list) or not suggestions:
+        return
+
+    # Build scoring context (reuse existing scoring + guardrails)
+    plan = build_preference_plan(responses)
+    profile = collect_profile_tags(responses, plan)
+
+    knowledge = _load_flavour_knowledge()
+    for item in repository._all_items:
+        try:
+            knowledge.enrich_ingredient(item)
+        except Exception:
+            continue
+    target_vector = knowledge.build_target_vector(responses, plan=plan)
+
+    existing_tags = _collect_tags(suggestions)
+    used_names = {
+        _normalize(getattr(s.ingredient, "name", ""))
+        for s in suggestions
+        if getattr(s, "ingredient", None)
+    }
+
+    rng = random.Random(time.time_ns() & 0xFFFFFFFF)
+    temp = _variety_temperature()
+
+    def _swap_role(role: str, *, chance: float, k: int, min_ratio: float) -> bool:
+        nonlocal existing_tags, used_names
+
+        current_idx = None
+        current_ing = None
+        for idx, s in enumerate(suggestions):
+            if _normalize(getattr(s, "role", "")) == _normalize(role):
+                current_idx = idx
+                current_ing = getattr(s, "ingredient", None)
+                break
+        if current_idx is None or current_ing is None:
+            return False
+
+        if rng.random() > chance:
+            return False
+
+        current_name = _normalize(getattr(current_ing, "name", ""))
+
+        pool: List[Ingredient] = []
+        for item in repository._all_items:
+            if _normalize(getattr(item, "role", "")) != _normalize(role):
+                continue
+            name = _normalize(getattr(item, "name", ""))
+            if not name or name == current_name or name in used_names:
+                continue
+
+            # dessert-only guardrail
+            if getattr(item, "dessert_only", False) and _normalize(profile_name) != "dessert":
+                continue
+
+            pool.append(item)
+
+        if not pool:
+            return False
+
+        ranked = _rank_ingredients(
+            pool,
+            profile,
+            association_model=association_model,
+            existing_tags=existing_tags,
+            role=role,
+            keyword_hints=None,
+            knowledge_base=knowledge,
+            target_vector=target_vector,
+            plan=plan,
+        )
+
+        chosen = _weighted_choice_from_ranked(
+            ranked,
+            rng=rng,
+            k=k,
+            min_score_ratio=min_ratio,
+            temperature=temp,
+        )
+        if chosen is None:
+            return False
+
+        # swap ingredient only (keep amount)
+        suggestions[current_idx].ingredient = chosen  # type: ignore[attr-defined]
+        used_names.add(_normalize(getattr(chosen, "name", "")))
+        existing_tags = _collect_tags(suggestions)
+
+        if role == "garnish" and hasattr(recipe, "garnish"):
+            try:
+                setattr(recipe, "garnish", getattr(chosen, "name", None))
+            except Exception:
+                pass
+
+        return True
+
+    # Visible variety first
+    swapped = _swap_role("garnish", chance=0.80, k=5, min_ratio=0.72)
+    if not swapped:
+        swapped = _swap_role("sweetener", chance=0.55, k=4, min_ratio=0.75)
+    if not swapped:
+        _swap_role("modifier", chance=0.45, k=4, min_ratio=0.78)
+
 
 
 def _coerce_string_list(value: Optional[object]) -> List[str]:
@@ -2549,7 +2754,6 @@ def _build_steps(
     return steps
 
 
-# Profile-based override using the simplified rule engine.
 def generate_cocktail_recipe(
     responses: Dict[str, Optional[str]],
     *,
@@ -2565,15 +2769,34 @@ def generate_cocktail_recipe(
     if repository is None:
         repository = StockRepository()
 
+    # Association model is only used for the variety post-pass scoring
+    if association_model is None and _variety_enabled_for_bar(bar_id):
+        association_model = _load_default_association_model()
+
     responses_with_bar = dict(responses)
     responses_with_bar["bar_id"] = bar_id
 
     from recipebuilder.profile_builder import ProfileRecipeBuilder, choose_profile
 
-    profile = choose_profile(responses_with_bar)
+    profile_name = choose_profile(responses_with_bar)
 
     repository.prime_cache(bar_id)
     builder = ProfileRecipeBuilder(repository)
-    recipe = builder.build_recipe(responses_with_bar, profile)
+    recipe = builder.build_recipe(responses_with_bar, profile_name)
+
+    # Safe, minimal variety layer (Aviary-only by default, or enable via VARIETY_LAYER=1)
+    if _variety_enabled_for_bar(bar_id):
+        try:
+            _apply_variety_pass_to_profile_recipe(
+                recipe,
+                repository=repository,
+                bar_id=bar_id,
+                responses=responses_with_bar,
+                profile_name=str(profile_name),
+                association_model=association_model,
+            )
+        except Exception:
+            logger.exception("Variety pass failed; serving original recipe.")
+
     recipe.name = recipe_name
     return recipe
