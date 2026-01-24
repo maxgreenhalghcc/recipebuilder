@@ -335,6 +335,42 @@ def _apply_variety_pass_to_profile_recipe(
         force=False,
     )
 
+def _apply_serving_style_pass(recipe: object, *, responses: Dict[str, Optional[str]]) -> None:
+    if not hasattr(recipe, "glassware") or not hasattr(recipe, "ingredients"):
+        return
+
+    glass = _normalize(str(getattr(recipe, "glassware", "") or ""))
+    if "long glass" not in glass:
+        return  # don't touch non-long outputs
+
+    base = _normalize(str(responses.get("base_spirit") or ""))
+    carbonation = _normalize(str(responses.get("carbonation_texture") or ""))
+    music = _normalize(str(responses.get("music_preference") or ""))
+
+    ings = getattr(recipe, "ingredients", []) or []
+    names = " ".join(_normalize(getattr(getattr(s, "ingredient", None), "name", "")) for s in ings)
+
+    # deterministic-ish randomness per request (uses provided seed if present)
+    seed_raw = responses.get("seed")
+    try:
+        seed = int(seed_raw) if seed_raw is not None else None
+    except (TypeError, ValueError):
+        seed = None
+    rng = random.Random(seed if seed is not None else time.time_ns() & 0xFFFFFFFF)
+
+    # hard sensible override: gin + tonic => gin glass
+    if base == "gin" and "tonic water" in names:
+        recipe.glassware = "gin glass"
+        return
+
+    # very light variety to satisfy owner: 30% of the time, pick a safe alternative
+    if rng.random() < 0.30:
+        if "jazz" in music and carbonation in {"still & silky", ""}:
+            recipe.glassware = "chilled coupe"
+        elif "dark rum" in names or "spiced rum" in names:
+            recipe.glassware = "rocks glass"
+        else:
+            recipe.glassware = "gin glass"
 
 
 def _coerce_string_list(value: Optional[object]) -> List[str]:
@@ -2891,6 +2927,11 @@ def generate_cocktail_recipe(
     repository.prime_cache(bar_id)
     builder = ProfileRecipeBuilder(repository)
     recipe = builder.build_recipe(responses_with_bar, profile_name)
+    try:
+        _apply_serving_style_pass(recipe, responses=responses_with_bar)
+    except Exception:
+        logger.exception("Serving style pass failed; leaving glassware/garnish unchanged.")
+
 
     # Safe, minimal variety layer (Aviary-only by default, or enable via VARIETY_LAYER=1)
     if _variety_enabled_for_bar(bar_id):
