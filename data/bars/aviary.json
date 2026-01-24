@@ -671,20 +671,6 @@
       "neutral": false
     },
     {
-      "name": "Passionfruit Juice",
-      "category": "juice",
-      "flavour_tags": ["exotic", "indulgent"],
-      "profiles": ["dessert", "tropical"],
-      "aromas": ["sweet"],
-      "seasons": ["winter", "summer"],
-      "spirits": ["vodka", "rum", "gin", "tequila"],
-      "default_measure_ml": 25.0,
-      "role": "juice",
-      "avoid_profiles": ["classic_boozy"],
-      "neutral": false
-    },
-
-    {
       "name": "Soda Water",
       "category": "mixer",
       "flavour_tags": ["clean"],
@@ -744,7 +730,7 @@
       "name": "Oranges",
       "category": "garnish",
       "flavour_tags": ["zesty", "fresh"],
-      "profiles": ["citrus_fresh", "tropical", "classic_boozy"],
+      "profiles": ["citrus_fresh", "classic_boozy"],
       "aromas": ["citrus"],
       "seasons": ["all"],
       "default_measure_ml": 0.0,
@@ -776,7 +762,7 @@
     {
       "name": "Passionfruit",
       "category": "garnish",
-      "flavour_tags": ["tropical", "exotic"],
+      "flavour_tags": ["tropical", "exotic","citrus_fresh"],
       "profiles": ["tropical", "dessert"],
       "aromas": ["sweet"],
       "seasons": ["summer", "winter"],
