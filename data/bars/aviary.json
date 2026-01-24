@@ -539,12 +539,13 @@
       "category": "syrup",
       "flavour_tags": ["zesty", "fresh"],
       "profiles": ["citrus_fresh"],
+      "avoid_profiles": ["candy_fun", "dessert"],
       "aromas": ["citrus"],
       "seasons": ["summer"],
       "spirits": ["gin", "vodka", "rum", "tequila"],
       "default_measure_ml": 15.0,
       "role": "sweetener",
-      "neutral": false
+      "neutral": false      
     },
     {
       "name": "Elderflower Cordial",
