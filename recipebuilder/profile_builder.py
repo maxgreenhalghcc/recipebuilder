@@ -665,9 +665,45 @@ class ProfileRecipeBuilder:
             "haunted house": Glass("skull glass", 400, sparkling=False),
             "tree house": Glass("gin glass", 500, sparkling=True),
         }
-        glass = mapping.get((responses.get("house_type") or "").strip().lower())
-        if glass:
-            return glass
+    
+        house_key = (responses.get("house_type") or "").strip().lower()
+        base_glass = mapping.get(house_key)
+    
+        # Always honour haunted house (no randomness)
+        if base_glass and house_key == "haunted house":
+            return base_glass
+    
+        # Seeded randomness (stable per request if seed exists)
+        seed_raw = responses.get("seed")
+        try:
+            seed = int(seed_raw) if seed_raw is not None else random.getrandbits(32)
+        except (TypeError, ValueError):
+            seed = random.getrandbits(32)
+        rnd = random.Random(seed)
+    
+        # If we know the house, keep it MOST of the time, but add small safe variety.
+        if base_glass:
+            # Beach house dominates: allow 25% gin glass as an alternate “fizzy serve” glass
+            if house_key == "beach house":
+                if (carbonation.startswith("properly") or carbonation.startswith("light")) and rnd.random() < 0.25:
+                    return Glass("gin glass", 500, sparkling=True)
+                return base_glass
+    
+            # Modern house: mostly martini, sometimes coupe when not fizzy
+            if house_key == "modern house":
+                if not (carbonation.startswith("properly") or carbonation.startswith("light")) and rnd.random() < 0.25:
+                    return Glass("chilled coupe", 250, sparkling=False)
+                return base_glass
+    
+            # Tree house: mostly gin glass, occasionally rocks for “darker” feeling (still sparkling-safe)
+            if house_key == "tree house":
+                if rnd.random() < 0.20:
+                    return Glass("rocks glass", 300, sparkling=True)
+                return base_glass
+    
+            return base_glass
+    
+        # Fallbacks if house_type not matched
         if carbonation.startswith("properly") or carbonation.startswith("light"):
             return Glass("long glass", 400, sparkling=True)
         return Glass("martini glass", 250, sparkling=False)
@@ -1039,14 +1075,41 @@ class ProfileRecipeBuilder:
         return _pick_first_matching(list(mixers), target_keywords) if mixers else None
 
     def _pick_garnish(self, garnishes: Sequence[StockItem], juices: Sequence[StockItem], keywords: Sequence[str]) -> str:
+        """
+        Pick garnish sensibly:
+        1) If a juice flavour matches a garnish name, use that garnish (e.g., pineapple juice -> pineapple garnish).
+        2) Else, use profile keywords (e.g., citrus_fresh -> lemon/lime).
+        3) Else, fall back to first available garnish.
+        This prevents random pineapple on non-pineapple drinks.
+        """
         choices = list(garnishes)
+        if not choices:
+            return ""
+    
+        # 1) Juice-driven garnish (only if an actual match exists)
         if juices:
-            juice_tokens = " ".join(j.name.lower() for j in juices).split()
-            garnish = _pick_first_matching(choices, juice_tokens)
-            if garnish:
-                return garnish.name
-        garnish = _pick_first_matching(choices, keywords)
-        return garnish.name if garnish else ""
+            juice_tokens = set()
+            for j in juices:
+                for tok in (j.name or "").lower().replace("&", " ").replace("-", " ").split():
+                    if tok:
+                        juice_tokens.add(tok)
+    
+            for cand in choices:
+                name = cand.name.lower()
+                if any(tok in name for tok in juice_tokens):
+                    return cand.name
+    
+        # 2) Keyword-driven garnish (only if an actual match exists)
+        lowered_keywords = [k.lower() for k in (keywords or []) if k]
+        if lowered_keywords:
+            for cand in choices:
+                name = cand.name.lower()
+                if any(k in name for k in lowered_keywords):
+                    return cand.name
+
+    # 3) Last resort fallback
+    return choices[0].name
+
 
     def _build_steps(self, glass: str, mixer: Optional[str]) -> List[str]:
         steps = [
