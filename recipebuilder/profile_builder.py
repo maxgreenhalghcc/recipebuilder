@@ -314,29 +314,25 @@ class ProfileRecipeBuilder:
         self.repository = repository
         self.glass_logic = glass_logic
 
-    def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe: 
+    def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe:
         base_seed = seed if seed is not None else random.getrandbits(32)
         self._load_items(responses)
-    
-        # try a few times before giving up
+
         last_error: Exception | None = None
         for attempt in range(1, 6):
             rnd = random.Random(base_seed + attempt)  # stable-ish rerolls
             try:
-                recipe = self._build_single_recipe(responses, profile, rnd)
-                return recipe
+                return self._build_single_recipe(responses, profile, rnd)
             except GuardrailReject as e:
                 last_error = e
                 continue
             except Exception as e:
                 last_error = e
                 continue
-    
-        # surface the last error if everything failed
+
         if last_error:
             raise last_error
         raise ValueError("Failed to build recipe.")
-
 
     def build_candidates(
         self,
@@ -407,7 +403,6 @@ class ProfileRecipeBuilder:
         base_target = {"strong": 60.0, "medium": 50.0, "low": 40.0}.get(abv_lane, 50.0)
 
         carbonation = (responses.get("carbonation_texture") or "still").strip().lower()
-
         glass = self._choose_glass(responses, carbonation)
 
         def profile_items(role: str) -> List[StockItem]:
@@ -435,13 +430,17 @@ class ProfileRecipeBuilder:
 
         juice_pool = profile_items("juice")
         core_juices = [i for i in juice_pool if _is_core_juice(i)]
-        # Keep gin + citrus_fresh sharp: avoid pineapple juice in this lane
+
         base_spirit = (responses.get("base_spirit") or "").lower()
         aroma = (responses.get("aroma_preference") or "").strip().lower()
         sweet_style = (responses.get("sweetener_question") or "").strip().lower()
+
+        # Keep gin + citrus_fresh sharp: avoid pineapple juice in this lane
         if base_spirit == "gin" and profile == "citrus_fresh" and ("citrus" in aroma or "zesty" in sweet_style):
             core_juices = [j for j in core_juices if "pineapple" not in j.name.lower()]
+
         juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=2)
+
         sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
             profile,
             base_family,
@@ -451,31 +450,29 @@ class ProfileRecipeBuilder:
             rnd,
             aroma_preference=responses.get("aroma_preference") or "",
         )
-        aroma = (responses.get("aroma_preference") or "").strip().lower()
-        
+
+        # Modifier keyword adjustments (floral prefer elderflower etc.)
         modifier_keywords = list(prefs.get("modifier_keywords") or [])
         sweetener_keywords = list(prefs.get("sweetener_keywords") or [])
-        
+
         if aroma == "floral":
             floral_terms = ("elderflower", "st germain", "st-germain", "stgermain")
-        
             modifiers_pool = profile_items("modifier")
             sweeteners_pool = profile_items("sweetener")
-        
-            # Prefer elderflower whether it's stocked as modifier or sweetener
+
             if _has_any_term(modifiers_pool, floral_terms):
                 modifier_keywords = ["elderflower", "st germain"] + [
                     k for k in modifier_keywords
                     if "elder" not in k.lower() and "germain" not in k.lower()
                 ]
-        
             if _has_any_term(sweeteners_pool, floral_terms):
                 sweetener_keywords = ["elderflower", "st germain"] + [
                     k for k in sweetener_keywords
                     if "elder" not in k.lower() and "germain" not in k.lower()
                 ]
-       
+
         modifier = self._choose_modifier(profile_items("modifier"), modifier_keywords)
+
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
         sour = self._maybe_add_sour(profile, available_sours, prefs["needs_sour"])
 
@@ -510,6 +507,7 @@ class ProfileRecipeBuilder:
             juices,
             juice_amounts,
         )
+
         if sweetness_load >= 25.0:
             if sour is None and available_sours:
                 sour = available_sours[0]
@@ -531,41 +529,44 @@ class ProfileRecipeBuilder:
 
         spirit_extra = flavoured_ml if flavoured_spirit and flavoured_spirit.category == "spirit" else 0.0
         core_volume = base_ml + modifier_ml + sweet_ml + sour_ml + sum(juice_amounts) + spirit_extra
-        bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
 
+        bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
         mixer_keywords = list(prefs.get("mixer_keywords") or [])
-        
-        # Your rule: tonic only for high bitterness top-up
+
+        # Tonic only for high bitterness top-up
         if bitterness == "high":
             if "tonic" not in mixer_keywords:
                 mixer_keywords.append("tonic")
         else:
             mixer_keywords = [k for k in mixer_keywords if "tonic" not in k.lower()]
-        
-        mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
 
+        # --- FIXED mixer logic: do NOT wipe mixer_item ---
         mixer_item: Optional[StockItem] = None
         mixer_ml = 0.0
+
         if glass.sparkling:
             mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
             space = max(0.0, glass.capacity_ml - core_volume)
             target_min = 80.0 if carbonation.startswith("properly") else 40.0
-            mixer_ml = min(max(space, target_min), max(space, glass.capacity_ml - core_volume + target_min)) if mixer_item else 0.0
+            if mixer_item:
+                mixer_ml = max(target_min, space)
         elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
             mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
-            mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume)) if mixer_item else 0.0
+            if mixer_item:
+                mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume))
 
         if carbonation.startswith("properly") and (mixer_item is None or not _is_mixer(mixer_item)):
             fallback_mixers = self.repository.neutral_items(role="mixer") + profile_items("mixer")
             mixer_item = self._select_mixer(fallback_mixers, mixer_keywords, carbonation)
             if mixer_item:
                 space = max(0.0, glass.capacity_ml - core_volume)
-                target_min = 80.0
-                mixer_ml = max(target_min, space)
+                mixer_ml = max(80.0, space)
 
         if mixer_item is None and glass.sparkling and not carbonation.startswith("properly"):
-            mixer_item = _pick_first_matching(profile_items("juice"), prefs["juice_keywords"]) if juices else None
-            if mixer_item:
+            # last fallback: use extra juice as a "lengthener"
+            fallback = _pick_first_matching(profile_items("juice"), prefs["juice_keywords"]) if juices else None
+            if fallback:
+                mixer_item = fallback
                 mixer_ml = max(25.0, glass.capacity_ml - core_volume)
 
         suggestions: List[IngredientSuggestion] = [IngredientSuggestion(base, base_ml, "base")]
@@ -583,8 +584,7 @@ class ProfileRecipeBuilder:
         if mixer_item and mixer_ml > 0:
             suggestions.append(IngredientSuggestion(mixer_item, mixer_ml, "mixer"))
 
-        # MINIMUM VIABLE COCKTAIL GUARDRAIL:
-        # If we ended up with no juice and no sour, add a core juice so we never serve a 3-ingredient "spiked mixer".
+        # Keep your quick MVC safety net (guardrails will also enforce)
         has_juice = any(s.role == "juice" for s in suggestions)
         has_sour = any(s.role == "sour" for s in suggestions)
         if (not has_juice) and (not has_sour):
@@ -592,10 +592,6 @@ class ProfileRecipeBuilder:
             fallback = _pick_first_matching(fallback_pool, ["orange", "apple", "cranberry"])
             if fallback:
                 suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
-
-
-        garnish = self._pick_garnish(self.repository.items_for_profile(profile, role="garnish"), juices, prefs["garnish_keywords"])
-        steps = self._build_steps(glass.name, mixer_item.name if mixer_item else None)
 
         used_fallback = False
         relaxed_profile = profile
@@ -611,17 +607,30 @@ class ProfileRecipeBuilder:
             else:
                 raise
 
+        # --- GUARDRAILS PASS (fix / validate / reject) ---
+        glass, suggestions, garnish, steps, fixes = self._apply_guardrails(
+            responses=responses,
+            profile=relaxed_profile,
+            glass=glass,
+            suggestions=suggestions,
+        )
+        ice = self._ensure_ice_program(glass, responses)
+
+        meta: Dict[str, object] = {"used_fallback": True} if used_fallback else {}
+        if fixes:
+            meta["guardrail_fixes"] = fixes
+
         return CocktailRecipe(
             name="Signature Serve",
             glassware=glass.name,
-            ice="cubed" if glass.sparkling else "none",
+            ice=ice,
             ingredients=suggestions,
             steps=steps,
             flavour_profile=[(relaxed_profile, 1.0)],
             garnish=garnish,
             notes=None,
             explanations=(),
-            meta={"used_fallback": True} if used_fallback else {},
+            meta=meta,
         )
 
     def _profile_preferences(self, profile: str, responses: Dict[str, Any] | None = None) -> Dict[str, Any]:
@@ -708,45 +717,38 @@ class ProfileRecipeBuilder:
             "haunted house": Glass("skull glass", 400, sparkling=False),
             "tree house": Glass("gin glass", 500, sparkling=True),
         }
-    
+
         house_key = (responses.get("house_type") or "").strip().lower()
         base_glass = mapping.get(house_key)
-    
-        # Always honour haunted house (no randomness)
+
         if base_glass and house_key == "haunted house":
             return base_glass
-    
-        # Seeded randomness (stable per request if seed exists)
+
         seed_raw = responses.get("seed")
         try:
             seed = int(seed_raw) if seed_raw is not None else random.getrandbits(32)
         except (TypeError, ValueError):
             seed = random.getrandbits(32)
         rnd = random.Random(seed)
-    
-        # If we know the house, keep it MOST of the time, but add small safe variety.
+
         if base_glass:
-            # Beach house dominates: allow 25% gin glass as an alternate “fizzy serve” glass
             if house_key == "beach house":
                 if (carbonation.startswith("properly") or carbonation.startswith("light")) and rnd.random() < 0.25:
                     return Glass("gin glass", 500, sparkling=True)
                 return base_glass
-    
-            # Modern house: mostly martini, sometimes coupe when not fizzy
+
             if house_key == "modern house":
                 if not (carbonation.startswith("properly") or carbonation.startswith("light")) and rnd.random() < 0.25:
                     return Glass("chilled coupe", 250, sparkling=False)
                 return base_glass
-    
-            # Tree house: mostly gin glass, occasionally rocks for “darker” feeling (still sparkling-safe)
+
             if house_key == "tree house":
                 if rnd.random() < 0.20:
                     return Glass("rocks glass", 300, sparkling=True)
                 return base_glass
-    
+
             return base_glass
-    
-        # Fallbacks if house_type not matched
+
         if carbonation.startswith("properly") or carbonation.startswith("light"):
             return Glass("long glass", 400, sparkling=True)
         return Glass("martini glass", 250, sparkling=False)
@@ -783,6 +785,7 @@ class ProfileRecipeBuilder:
             ]
             if fallback_pool:
                 return max(fallback_pool, key=subtype_score)
+
         ranked = sorted(items, key=subtype_score, reverse=True)
         preferred = _pick_first_matching(ranked, keywords)
         return preferred or (ranked[0] if ranked else None)
@@ -809,7 +812,7 @@ class ProfileRecipeBuilder:
             remainder = [i for i in filtered if i not in picks]
             rnd.shuffle(remainder)
             picks.extend(remainder[: limit - len(picks)])
-        # Ensure pineapple is secondary if other options exist
+
         pineapples = [p for p in picks if "pineapple" in p.name.lower()]
         if pineapples and len(picks) > 1:
             primary_candidates = [p for p in picks if p not in pineapples]
@@ -831,15 +834,11 @@ class ProfileRecipeBuilder:
         flavour_words = PROFILE_FLAVOUR_WORDS.get(profile, [])
         matching_syrups = [s for s in sweeteners if any(word in s.name.lower() for word in flavour_words)]
         neutral_syrups = [s for s in sweeteners if s not in matching_syrups]
-        # Floral: strongly prefer elderflower syrup/cordial when available
+
         if (aroma_preference or "").strip().lower() == "floral":
             floral_terms = ("elderflower", "st germain", "st-germain", "stgermain")
-            elderflower_syrups = [
-                s for s in sweeteners
-                if any(t in s.name.lower() for t in floral_terms)
-            ]
+            elderflower_syrups = [s for s in sweeteners if any(t in s.name.lower() for t in floral_terms)]
             if elderflower_syrups:
-                # Put elderflower first, but keep other matches as fallback
                 matching_syrups = elderflower_syrups + [s for s in matching_syrups if s not in elderflower_syrups]
                 neutral_syrups = [s for s in neutral_syrups if s not in elderflower_syrups]
 
@@ -848,7 +847,6 @@ class ProfileRecipeBuilder:
             for word in flavour_words:
                 flavoured_spirits.extend(self.repository.find_flavoured_spirits(base_family, word, profile))
 
-        # Deduplicate flavoured spirits by name
         unique_spirits: List[StockItem] = []
         seen: set[str] = set()
         for spirit in flavoured_spirits:
@@ -875,6 +873,7 @@ class ProfileRecipeBuilder:
                 sweetener_pick = grenadine_first[0]
                 sweet_ml = rnd.uniform(12, 18)
                 matching_syrups = [s for s in matching_syrups if s != sweetener_pick]
+
         if sweetener_pick is None and matching_syrups:
             sweetener_pick = matching_syrups[0]
             sweet_ml = rnd.uniform(12, 18)
@@ -888,7 +887,6 @@ class ProfileRecipeBuilder:
             sweetener_pick = neutral_syrups[0]
             sweet_ml = rnd.uniform(10, 16)
         else:
-            # Last resort: any base-adjacent item with a mild flavour (e.g. grenadine)
             sweetener_pick = _pick_first_matching(base_pool, flavour_words)
             sweet_ml = rnd.uniform(10, 14) if sweetener_pick else 0.0
 
@@ -979,7 +977,6 @@ class ProfileRecipeBuilder:
             sour_ml = clamp(sour_ml * scale, 10.0, 25.0)
 
         juice_list = self._cap_pineapple_ratio(juices, juice_list, sour_ml)
-
         return juice_list, sour_ml
 
     def _apply_citrus_rules(
@@ -1047,8 +1044,6 @@ class ProfileRecipeBuilder:
                 if pool:
                     juices = juices[:1] + [pool[0]] if juices else [pool[0]]
                     adjusted_amounts = adjusted_amounts[:1] + [max(25.0, adjusted_amounts[0] if adjusted_amounts else 25.0)]
-                    
-
         return juices, adjusted_amounts, sour_ml
 
     def _apply_thickness_guard(
@@ -1113,27 +1108,15 @@ class ProfileRecipeBuilder:
         if not mixers and not carbonation.startswith("properly"):
             return None
         target_keywords = list(keywords)
-        # Don't auto-add tonic. Only select tonic when it's explicitly requested by keywords
-        # (keywords should be set upstream based on bitterness tolerance + carbonation).
-
         return _pick_first_matching(list(mixers), target_keywords) if mixers else None
 
     def _pick_garnish(self, garnishes: Sequence[StockItem], juices: Sequence[StockItem], keywords: Sequence[str]) -> str:
-        """
-        Pick garnish sensibly:
-        1) If a juice flavour matches a garnish name, use that garnish (e.g., pineapple juice -> pineapple garnish).
-        2) Else, use profile keywords (e.g., citrus_fresh -> lemon/lime).
-        3) Else, fall back to first available garnish.
-        This prevents random pineapple on non-pineapple drinks.
-        """
         choices = list(garnishes)
         if not choices:
             return ""
-            
-        # 1) Juice-driven garnish with priority (pineapple beats orange when both present)
+
         if juices:
             juice_text = " ".join((j.name or "").lower() for j in juices)
-        
             priority = []
             if "pineapple" in juice_text:
                 priority.append("pineapple")
@@ -1147,13 +1130,11 @@ class ProfileRecipeBuilder:
                 priority.append("lime")
             if "lemon" in juice_text:
                 priority.append("lemon")
-        
             for want in priority:
                 for cand in choices:
                     if want in cand.name.lower():
                         return cand.name
-    
-        # 2) Keyword-driven garnish (only if an actual match exists)
+
         lowered_keywords = [k.lower() for k in (keywords or []) if k]
         if lowered_keywords:
             for cand in choices:
@@ -1161,19 +1142,197 @@ class ProfileRecipeBuilder:
                 if any(k in name for k in lowered_keywords):
                     return cand.name
 
-        # 3) Last resort fallback
         return choices[0].name
 
+    # -----------------------------
+    # Guardrails helpers
+    # -----------------------------
 
-    def _build_steps(self, glass: str, mixer: Optional[str]) -> List[str]:
+    def _is_martini_style_glass(self, glass_name: str) -> bool:
+        g = (glass_name or "").lower()
+        return ("martini" in g) or ("coupe" in g)
+
+    def _count_components(self, suggestions: Sequence[IngredientSuggestion]) -> int:
+        return sum(1 for s in suggestions if s.role not in {"garnish"})
+
+    def _remove_mixers(self, suggestions: List[IngredientSuggestion]) -> tuple[List[IngredientSuggestion], bool]:
+        before = len(suggestions)
+        suggestions = [s for s in suggestions if s.role != "mixer"]
+        return suggestions, (len(suggestions) != before)
+
+    def _ensure_ice_program(self, glass: Glass, responses: Dict[str, Any]) -> str:
+        if self._is_martini_style_glass(glass.name):
+            return "none"
+        return "cubed"
+
+    def _pick_garnish_guardrailed(
+        self,
+        responses: Dict[str, Any],
+        profile: str,
+        garnishes: Sequence[StockItem],
+        suggestions: Sequence[IngredientSuggestion],
+    ) -> str:
+        if not garnishes:
+            return ""
+
+        gchoices = list(garnishes)
+
+        names = " ".join((s.ingredient.name or "").lower() for s in suggestions)
+
+        # colour-ish cues (rough but works well in practice)
+        colour_priority: list[str] = []
+        if any(t in names for t in ("blue", "curaçao", "curacao")):
+            colour_priority.append("blue")
+        if any(t in names for t in ("violet", "purple")):
+            colour_priority.append("violet")
+        if any(t in names for t in ("cranberry", "raspberry", "strawberry", "cherry", "grenadine")):
+            colour_priority.append("berry")
+        if any(t in names for t in ("mint", "lime", "kiwi")):
+            colour_priority.append("mint")
+        if any(t in names for t in ("pineapple", "passion", "mango")):
+            colour_priority.append("pineapple")
+        if "orange" in names:
+            colour_priority.append("orange")
+        if any(t in names for t in ("lemon", "lime")):
+            colour_priority.append("lemon")
+
+        aroma = (responses.get("aroma_preference") or "").strip().lower()
+        sweet_style = (responses.get("sweetener_question") or "").strip().lower()
+        carbonation = (responses.get("carbonation_texture") or "").strip().lower()
+
+        palette_priority: list[str] = []
+        if "fresh" in sweet_style or "zesty" in sweet_style or "citrus" in aroma:
+            palette_priority += ["mint", "lemon", "lime"]
+        if profile == "tropical":
+            palette_priority += ["pineapple", "orange", "mint"]
+        if "woody" in aroma or "wood" in aroma:
+            palette_priority += ["orange"]
+
+        has_juice = any(s.role == "juice" for s in suggestions)
+        if carbonation.startswith("still") and has_juice:
+            palette_priority = ["mint"] + palette_priority
+
+        priority: list[str] = []
+        for token in (colour_priority + palette_priority):
+            if token and token not in priority:
+                priority.append(token)
+
+        for tok in priority:
+            for cand in gchoices:
+                if tok in cand.name.lower():
+                    return cand.name
+
+        return gchoices[0].name
+
+    def _build_steps_guardrailed(
+        self,
+        glass: Glass,
+        responses: Dict[str, Any],
+        suggestions: Sequence[IngredientSuggestion],
+    ) -> List[str]:
+        carbonation = (responses.get("carbonation_texture") or "").strip().lower()
+        is_martini = self._is_martini_style_glass(glass.name)
+
+        mixer = next((s for s in suggestions if s.role == "mixer"), None)
+
+        if is_martini:
+            return [
+                "Add ingredients to a shaker with ice and shake hard.",
+                f"Strain into a chilled {glass.name}.",
+                "Garnish and serve.",
+            ]
+
+        if carbonation.startswith("still"):
+            return [
+                "Add ingredients to a shaker with ice and shake hard.",
+                f"Strain into an ice-filled {glass.name}.",
+                "Garnish and serve.",
+            ]
+
         steps = [
-            f"Add ingredients to a shaker and shake hard.",
-            f"Strain into a chilled {glass}.",
+            f"Fill a {glass.name} with cubed ice.",
+            "Add spirits, syrups, juices and sour. Give a brief stir.",
         ]
         if mixer:
-            steps.append(f"Top with {mixer}.")
+            steps.append(f"Top with {mixer.ingredient.name}.")
         steps.append("Garnish and serve.")
         return steps
+
+    def _apply_guardrails(
+        self,
+        responses: Dict[str, Any],
+        profile: str,
+        glass: Glass,
+        suggestions: List[IngredientSuggestion],
+    ) -> tuple[Glass, List[IngredientSuggestion], str, List[str], List[str]]:
+        fixes: List[str] = []
+        reasons: List[str] = []
+
+        carbonation = (responses.get("carbonation_texture") or "").strip().lower()
+        aroma = (responses.get("aroma_preference") or "").strip().lower()
+
+        is_martini = self._is_martini_style_glass(glass.name)
+
+        # 1) Still & silky must not have carbonated mixers
+        if carbonation.startswith("still"):
+            suggestions, removed = self._remove_mixers(suggestions)
+            if removed:
+                fixes.append("REMOVED_MIXER_FOR_STILL")
+
+        # 2) Martini rules: no top (always shaken)
+        if is_martini:
+            suggestions, removed = self._remove_mixers(suggestions)
+            if removed:
+                fixes.append("REMOVED_MIXER_FOR_MARTINI")
+
+        # 3) Minimum viable cocktail (>=5 components) with autofill
+        if self._count_components(suggestions) < 5:
+            fixes.append("UNDERBUILT_AUTOFILL")
+
+            has_juice = any(s.role == "juice" for s in suggestions)
+            has_sour = any(s.role == "sour" for s in suggestions)
+            has_sweet = any(s.role == "sweetener" for s in suggestions)
+
+            if not has_juice and not has_sour:
+                pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+                fallback = _pick_first_matching(pool, ["orange", "apple", "cranberry", "pineapple"])
+                if fallback:
+                    suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
+                    fixes.append("ADDED_CORE_JUICE")
+
+            has_sour = any(s.role == "sour" for s in suggestions)
+            if has_sweet and not has_sour:
+                pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
+                fallback = _pick_first_matching(pool, ["lemon", "lime"])
+                if fallback:
+                    suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 15.0, "sour"))
+                    fixes.append("ADDED_CORE_SOUR")
+
+        # 4) Woody coherence (simple ban-list)
+        if "wood" in aroma or "woody" in aroma:
+            banned = ("malibu", "passion", "pineapple syrup", "bubblegum", "midori")
+            if any(b in s.ingredient.name.lower() for s in suggestions for b in banned):
+                reasons.append("WOODY_TROPICAL_CONFLICT")
+
+        # Final rejection if still bad
+        if self._count_components(suggestions) < 5:
+            reasons.append("UNDERBUILT")
+
+        garnish_items = self.repository.items_for_profile(profile, role="garnish")
+        garnish = self._pick_garnish_guardrailed(responses, profile, garnish_items, suggestions)
+        if garnish == "" and garnish_items:
+            garnish = garnish_items[0].name
+
+        steps = self._build_steps_guardrailed(glass, responses, suggestions)
+
+        if reasons:
+            raise GuardrailReject(reasons=reasons, fixes=fixes)
+
+        return glass, suggestions, garnish, steps, fixes
+
+    # -----------------------------
+    # Existing validator + fallback logic
+    # -----------------------------
 
     def _validate(
         self,
@@ -1344,6 +1503,6 @@ class ProfileRecipeBuilder:
             elif dessert_after and "amaretto" in dessert_after[0].ingredient.name.lower():
                 cleaned = [s for s in cleaned if s not in dessert_after[1:]]
                 used_fallback = True
-
         return relaxed_profile, cleaned, used_fallback
+
 
