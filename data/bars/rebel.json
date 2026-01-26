@@ -511,7 +511,111 @@
       "default_measure_ml": 0.0,
       "role": "garnish",
       "neutral": false
-    }
+    },
+      {
+    "name": "Martini Glass",
+    "category": "glassware",
+    "flavour_tags": ["classic", "elegant"],
+    "profiles": ["classic_boozy"],
+    "aromas": ["fresh"],
+    "seasons": ["all"],
+    "default_measure_ml": 0.0,
+    "role": "glassware",
+    "neutral": true,
+    "house_types": ["modern house"]
+  },
+  {
+    "name": "Mason Jar",
+    "category": "glassware",
+    "flavour_tags": ["fun", "rustic"],
+    "profiles": ["candy_fun", "tropical"],
+    "aromas": ["fresh"],
+    "seasons": ["all"],
+    "default_measure_ml": 0.0,
+    "role": "glassware",
+    "neutral": true,
+    "house_types": ["haunted house"]
+  },
+  {
+    "name": "Gin Glass",
+    "category": "glassware",
+    "flavour_tags": ["fresh", "classic"],
+    "profiles": ["citrus_fresh", "classic_boozy", "berry"],
+    "aromas": ["fresh"],
+    "seasons": ["all"],
+    "default_measure_ml": 0.0,
+    "role": "glassware",
+    "neutral": true,
+    "house_types": ["tree house"]
+  },
+  {
+    "name": "Long Glass",
+    "category": "glassware",
+    "flavour_tags": ["refreshing", "clean"],
+    "profiles": ["citrus_fresh", "tropical", "candy_fun"],
+    "aromas": ["fresh"],
+    "seasons": ["all"],
+    "default_measure_ml": 0.0,
+    "role": "glassware",
+    "neutral": true,
+    "house_types": ["beach house"]
+  },
+
+  {
+    "name": "Orange",
+    "category": "garnish",
+    "flavour_tags": ["zesty", "fresh"],
+    "profiles": ["citrus_fresh", "tropical", "classic_boozy"],
+    "aromas": ["citrus"],
+    "seasons": ["all"],
+    "default_measure_ml": 0.0,
+    "role": "garnish",
+    "neutral": false
+  },
+  {
+    "name": "Berries",
+    "category": "garnish",
+    "flavour_tags": ["fruity", "vibrant"],
+    "profiles": ["berry", "candy_fun"],
+    "aromas": ["sweet"],
+    "seasons": ["spring"],
+    "default_measure_ml": 0.0,
+    "role": "garnish",
+    "neutral": false
+  },
+  {
+    "name": "Strawberry",
+    "category": "garnish",
+    "flavour_tags": ["fruity", "vibrant"],
+    "profiles": ["berry", "candy_fun"],
+    "aromas": ["sweet"],
+    "seasons": ["summer"],
+    "default_measure_ml": 0.0,
+    "role": "garnish",
+    "neutral": false
+  },
+  {
+    "name": "Lemon",
+    "category": "garnish",
+    "flavour_tags": ["zesty", "fresh"],
+    "profiles": ["citrus_fresh", "tropical"],
+    "aromas": ["citrus"],
+    "seasons": ["summer"],
+    "default_measure_ml": 0.0,
+    "role": "garnish",
+    "neutral": false
+  },
+  {
+    "name": "Lime",
+    "category": "garnish",
+    "flavour_tags": ["zesty", "fresh"],
+    "profiles": ["citrus_fresh", "tropical"],
+    "aromas": ["citrus"],
+    "seasons": ["summer"],
+    "default_measure_ml": 0.0,
+    "role": "garnish",
+    "neutral": false
+  }
   ]
 }
 
