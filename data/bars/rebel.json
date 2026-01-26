@@ -236,18 +236,6 @@
       "neutral": false
     },
     {
-      "name": "Tequila Rose",
-      "category": "modifier",
-      "flavour_tags": ["creamy", "sweet"],
-      "profiles": ["dessert"],
-      "aromas": ["berry"],
-      "seasons": ["spring", "winter"],
-      "default_measure_ml": 25.0,
-      "role": "modifier",
-      "neutral": false,
-      "is_creamy": true
-    },
-    {
       "name": "Blue Curaçao Orange Liqueur",
       "category": "modifier",
       "flavour_tags": ["zesty", "vibrant"],
