@@ -48,6 +48,13 @@ PROFILE_FLAVOUR_WORDS: Dict[str, List[str]] = {
 
 MAX_SHARED_INGREDIENT_RATIO = 0.7
 
+class GuardrailReject(Exception):
+    def __init__(self, reasons: Sequence[str], fixes: Sequence[str] = ()):
+        super().__init__(", ".join(reasons))
+        self.reasons = list(reasons)
+        self.fixes = list(fixes)
+
+
 
 def _is_sour(item: StockItem) -> bool:
     name = item.name.lower()
@@ -307,10 +314,29 @@ class ProfileRecipeBuilder:
         self.repository = repository
         self.glass_logic = glass_logic
 
-    def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe:
-        rnd = random.Random(seed if seed is not None else random.getrandbits(32))
+    def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe: 
+        base_seed = seed if seed is not None else random.getrandbits(32)
         self._load_items(responses)
-        return self._build_single_recipe(responses, profile, rnd)
+    
+        # try a few times before giving up
+        last_error: Exception | None = None
+        for attempt in range(1, 6):
+            rnd = random.Random(base_seed + attempt)  # stable-ish rerolls
+            try:
+                recipe = self._build_single_recipe(responses, profile, rnd)
+                return recipe
+            except GuardrailReject as e:
+                last_error = e
+                continue
+            except Exception as e:
+                last_error = e
+                continue
+    
+        # surface the last error if everything failed
+        if last_error:
+            raise last_error
+        raise ValueError("Failed to build recipe.")
+
 
     def build_candidates(
         self,
