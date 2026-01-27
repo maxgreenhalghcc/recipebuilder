@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Literal
 
 from recipebuilder.recipe_engine import (
     CocktailRecipe,
@@ -17,7 +17,60 @@ from recipebuilder.recipe_engine import (
     extract_flavour_keywords,
     extract_spirit_family,
 )
+
 from recipebuilder.preferences import _NON_RESPONSE_TOKENS, _tokenise_values
+
+TemplateId = Literal[
+    "SOUR_FOAMY",
+    "SOUR",
+    "COLLINS",
+    "HIGHBALL",
+    "SPRITZ",
+    "MARTINI_UP",
+    "OLD_FASHIONED",
+    "TIKI_SHAKEN",
+]
+
+def select_template(responses: Dict[str, Any]) -> TemplateId:
+    carb = (responses.get("carbonation_texture") or "").strip().lower()
+    foam = (responses.get("foam_toggle") or "").strip().lower()
+    house = (responses.get("house_type") or "").strip().lower()
+
+    still = "still" in carb
+    lightly = "light" in carb
+    properly = "proper" in carb or "spark" in carb
+
+    if still:
+        # no carbonated tops
+        if foam == "yes":
+            return "SOUR_FOAMY"
+        # modern house biases "up" drinks
+        if "modern" in house:
+            return "MARTINI_UP"
+        return "SOUR"
+
+    if properly:
+        # big top
+        return "SPRITZ"
+
+    # default fizzy = lightly / unknown
+    if foam == "yes":
+        # foamy highballs are rare; best safe template is still a sour style,
+        # but since carbonation isn't "still", we keep it as a shaken sour served long without top
+        return "SOUR_FOAMY"
+    return "HIGHBALL"
+    
+TEMPLATE_SPECS: Dict[str, Dict[str, Any]] = {
+    "SOUR_FOAMY": {"needs_sour": True, "needs_mixer": False, "max_juices": 1, "allow_foam": True},
+    "SOUR": {"needs_sour": True, "needs_mixer": False, "max_juices": 1, "allow_foam": False},
+    "MARTINI_UP": {"needs_sour": False, "needs_mixer": False, "max_juices": 0, "allow_foam": False},
+    "OLD_FASHIONED": {"needs_sour": False, "needs_mixer": False, "max_juices": 0, "allow_foam": False},
+    "HIGHBALL": {"needs_sour": True, "needs_mixer": True, "max_juices": 2, "allow_foam": False},
+    "COLLINS": {"needs_sour": True, "needs_mixer": True, "max_juices": 2, "allow_foam": False},
+    "SPRITZ": {"needs_sour": False, "needs_mixer": True, "max_juices": 2, "allow_foam": False},
+    "TIKI_SHAKEN": {"needs_sour": True, "needs_mixer": False, "max_juices": 3, "allow_foam": False},
+}
+
 
 
 @dataclass
@@ -307,6 +360,8 @@ def _should_exclude_stock(item: StockItem, avoid_terms: Set[str]) -> bool:
     return False
 
 
+
+
 class ProfileRecipeBuilder:
     """Build cocktails using profile-guarded stock items."""
 
@@ -405,6 +460,9 @@ class ProfileRecipeBuilder:
         carbonation = (responses.get("carbonation_texture") or "still").strip().lower()
         glass = self._choose_glass(responses, carbonation)
 
+        template = select_template(responses)
+        spec = TEMPLATE_SPECS[template]
+
         def profile_items(role: str) -> List[StockItem]:
             items = [item for item in self.repository.items_for_profile(profile, role=role) if not is_creamy(item)]
             if role != "garnish":
@@ -439,7 +497,7 @@ class ProfileRecipeBuilder:
         if base_spirit == "gin" and profile == "citrus_fresh" and ("citrus" in aroma or "zesty" in sweet_style):
             core_juices = [j for j in core_juices if "pineapple" not in j.name.lower()]
 
-        juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=2)
+        juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=spec["max_juices"])
 
         sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
             profile,
@@ -474,7 +532,7 @@ class ProfileRecipeBuilder:
         modifier = self._choose_modifier(profile_items("modifier"), modifier_keywords)
 
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
-        sour = self._maybe_add_sour(profile, available_sours, prefs["needs_sour"])
+        sour = self._maybe_add_sour(profile, available_sours, bool(spec["needs_sour"]))
 
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
@@ -540,34 +598,43 @@ class ProfileRecipeBuilder:
         else:
             mixer_keywords = [k for k in mixer_keywords if "tonic" not in k.lower()]
 
-        # --- FIXED mixer logic: do NOT wipe mixer_item ---
+        # ----------------------------
+        # TEMPLATE-DRIVEN MIXER LOGIC
+        # ----------------------------
         mixer_item: Optional[StockItem] = None
         mixer_ml = 0.0
 
-        if glass.sparkling:
-            mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
-            space = max(0.0, glass.capacity_ml - core_volume)
-            target_min = 80.0 if carbonation.startswith("properly") else 40.0
-            if mixer_item:
-                mixer_ml = max(target_min, space)
-        elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
-            mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
-            if mixer_item:
-                mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume))
-
-        if carbonation.startswith("properly") and (mixer_item is None or not _is_mixer(mixer_item)):
-            fallback_mixers = self.repository.neutral_items(role="mixer") + profile_items("mixer")
-            mixer_item = self._select_mixer(fallback_mixers, mixer_keywords, carbonation)
-            if mixer_item:
+        if spec["needs_mixer"]:
+            # Only attempt a top-up when template requires it
+            if glass.sparkling:
+                mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
                 space = max(0.0, glass.capacity_ml - core_volume)
-                mixer_ml = max(80.0, space)
+                target_min = 80.0 if carbonation.startswith("properly") else 40.0
+                if mixer_item:
+                    mixer_ml = max(target_min, space)
 
-        if mixer_item is None and glass.sparkling and not carbonation.startswith("properly"):
-            # last fallback: use extra juice as a "lengthener"
-            fallback = _pick_first_matching(profile_items("juice"), prefs["juice_keywords"]) if juices else None
-            if fallback:
-                mixer_item = fallback
-                mixer_ml = max(25.0, glass.capacity_ml - core_volume)
+            elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
+                mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
+                if mixer_item:
+                    mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume))
+
+            if carbonation.startswith("properly") and (mixer_item is None or not _is_mixer(mixer_item)):
+                fallback_mixers = self.repository.neutral_items(role="mixer") + profile_items("mixer")
+                mixer_item = self._select_mixer(fallback_mixers, mixer_keywords, carbonation)
+                if mixer_item:
+                    space = max(0.0, glass.capacity_ml - core_volume)
+                    mixer_ml = max(80.0, space)
+
+            if mixer_item is None and glass.sparkling and not carbonation.startswith("properly"):
+                # last fallback: use extra juice as a "lengthener"
+                fallback = _pick_first_matching(profile_items("juice"), prefs["juice_keywords"]) if juices else None
+                if fallback:
+                    mixer_item = fallback
+                    mixer_ml = max(25.0, glass.capacity_ml - core_volume)
+        else:
+            # Template says NO TOP (SOUR/MARTINI_UP/OLD_FASHIONED/TIKI_SHAKEN)
+            mixer_item = None
+            mixer_ml = 0.0
 
         suggestions: List[IngredientSuggestion] = [IngredientSuggestion(base, base_ml, "base")]
         if flavoured_spirit:
@@ -632,6 +699,7 @@ class ProfileRecipeBuilder:
             explanations=(),
             meta=meta,
         )
+
 
     def _profile_preferences(self, profile: str, responses: Dict[str, Any] | None = None) -> Dict[str, Any]:
         defaults = {
@@ -1270,8 +1338,19 @@ class ProfileRecipeBuilder:
 
         carbonation = (responses.get("carbonation_texture") or "").strip().lower()
         aroma = (responses.get("aroma_preference") or "").strip().lower()
-
+        
         is_martini = self._is_martini_style_glass(glass.name)
+        
+        # TEMPLATE ENFORCEMENT (template-first)
+        template = select_template(responses)
+        spec = TEMPLATE_SPECS[template]
+        
+        # If template says no mixer, strip it
+        if not spec["needs_mixer"]:
+            suggestions, removed = self._remove_mixers(suggestions)
+            if removed:
+                fixes.append("REMOVED_MIXER_FOR_TEMPLATE")
+
 
         # 1) Still & silky must not have carbonated mixers
         if carbonation.startswith("still"):
