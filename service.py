@@ -505,10 +505,6 @@ def _format_ingredient_list(recipe) -> list[str]:
         else:
             items.append(f"{amount_text} {name}")
 
-    if recipe.garnish:
-        items.append(f"Garnish: {recipe.garnish}")
-    if recipe.ice:
-        items.append(f"Serve over {recipe.ice.lower()}")
     return items
 
 
