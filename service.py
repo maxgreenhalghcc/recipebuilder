@@ -658,6 +658,12 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
 
     _remember_recipe(bar_id, session_id, signature_recipe)
 
+   ingredients_list = [
+        s for s in ingredients_list
+        if not s.startswith("Garnish:") and not s.startswith("Serve over")
+    ]
+
+
     response_payload = {
         "data": {
             "barId": bar_id,
