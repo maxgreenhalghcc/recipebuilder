@@ -406,9 +406,16 @@ class ProfileRecipeBuilder:
         while len(candidates) < num_candidates and attempts < max_attempts:
             attempts += 1
             recipe_seed = rnd.getrandbits(32)
-            candidate = self._build_single_recipe(responses, profile, random.Random(recipe_seed))
+            try:
+                candidate = self._build_single_recipe(responses, profile, random.Random(recipe_seed))
+            except GuardrailReject:
+                continue
+            except Exception:
+                continue
+
             if all(_ingredient_overlap_ratio(candidate, existing) <= MAX_SHARED_INGREDIENT_RATIO for existing in candidates):
                 candidates.append(candidate)
+
 
         return candidates
 
