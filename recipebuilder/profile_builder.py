@@ -1503,11 +1503,14 @@ class ProfileRecipeBuilder:
                     suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 15.0, "sour"))
                     fixes.append("ADDED_CORE_SOUR")
     
-        # 4) Woody coherence (simple ban-list)
+        # 4) Woody coherence: prefer repair over reject (bulletproof mode)
         if "wood" in aroma or "woody" in aroma:
             banned = ("malibu", "passion", "pineapple syrup", "bubblegum", "midori")
-            if any(b in s.ingredient.name.lower() for s in suggestions for b in banned):
-                reasons.append("WOODY_TROPICAL_CONFLICT")
+            before = len(suggestions)
+            suggestions[:] = [s for s in suggestions if not any(b in s.ingredient.name.lower() for b in banned)]
+            if len(suggestions) != before:
+                fixes.append("REMOVED_TROPICAL_FOR_WOODY")
+
     
         # -----------------------------
         # STEP 2: validate -> repair -> validate (template-aware)
