@@ -1394,6 +1394,11 @@ class ProfileRecipeBuilder:
         juices = [s for s in suggestions if s.role == "juice"]
         sours = [s for s in suggestions if s.role == "sour"]
         mixers = [s for s in suggestions if s.role == "mixer"]
+
+        # Require mixer for fizzy templates (so repair runs and can inject one)
+        if template in {"HIGHBALL", "COLLINS", "SPRITZ"} and len(mixers) == 0:
+            fails.append("MISSING_MIXER")
+
     
         if len(suggestions) < min_components:
             fails.append("UNDERBUILT")
@@ -1649,8 +1654,7 @@ class ProfileRecipeBuilder:
     
         fails = self._critic(template, suggestions)
         if fails:
-            # Bulletproof fallback: do NOT error, force a safe SOUR-style structure.
-            fixes.append("FALLBACK_SAFE_SOUR")
+            all_fixes.append("FALLBACK_SAFE_SOUR")
         
             # Strip mixer always
             suggestions[:] = [s for s in suggestions if s.role != "mixer"]
@@ -1676,11 +1680,9 @@ class ProfileRecipeBuilder:
                 if sw:
                     suggestions.append(IngredientSuggestion(sw, sw.default_measure_ml or 12.0, "sweetener"))
         
-            # After fallback, do not raise – continue to garnish/steps/return.
-
-    
-        # carry forward all fixes
+        # carry forward all fixes (including fallback)
         fixes = all_fixes
+
     
         # If woody conflict detected, still reject (this is a "personalisation" fail not a balance fail)
         if reasons:
