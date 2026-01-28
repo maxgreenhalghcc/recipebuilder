@@ -1414,7 +1414,7 @@ class ProfileRecipeBuilder:
         return fails
     
     
-   def _repair(
+    def _repair(
         self,
         template: str,
         responses: Dict[str, Any],
