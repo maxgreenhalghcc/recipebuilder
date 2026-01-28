@@ -1589,7 +1589,12 @@ class ProfileRecipeBuilder:
         # TEMPLATE ENFORCEMENT (template-first)
         template = select_template(responses)
         spec = TEMPLATE_SPECS[template]
-    
+        # Carbonation truth table override: lightly/properly must use a mixer-allowed template
+        if (carbonation.startswith("light") or carbonation.startswith("proper")) and template in {"SOUR", "SOUR_FOAMY", "MARTINI_UP", "OLD_FASHIONED"}:
+            template = "HIGHBALL"
+            spec = TEMPLATE_SPECS[template]
+            fixes.append("TEMPLATE_FORCED_HIGHBALL_FOR_FIZZ")
+
         # If template says no mixer, strip it
         if not spec["needs_mixer"]:
             suggestions, removed = self._remove_mixers(suggestions)
