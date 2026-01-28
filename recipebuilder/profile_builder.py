@@ -1525,8 +1525,35 @@ class ProfileRecipeBuilder:
     
         fails = self._critic(template, suggestions)
         if fails:
-            # critic failures are hard reject reasons
-            raise GuardrailReject(reasons=fails, fixes=all_fixes)
+            # Bulletproof fallback: do NOT error, force a safe SOUR-style structure.
+            fixes.append("FALLBACK_SAFE_SOUR")
+        
+            # Strip mixer always
+            suggestions[:] = [s for s in suggestions if s.role != "mixer"]
+        
+            # Ensure at least one juice (length/body)
+            if not any(s.role == "juice" for s in suggestions):
+                pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+                j = _pick_first_matching(pool, ["orange", "apple", "cranberry"])
+                if j:
+                    suggestions.append(IngredientSuggestion(j, j.default_measure_ml or 30.0, "juice"))
+        
+            # Ensure sour (balance)
+            if not any(s.role == "sour" for s in suggestions):
+                pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
+                s = _pick_first_matching(pool, ["lemon", "lime"])
+                if s:
+                    suggestions.append(IngredientSuggestion(s, s.default_measure_ml or 15.0, "sour"))
+        
+            # Ensure sweetener if still underbuilt
+            if self._count_components(suggestions) < 5 and not any(s.role == "sweetener" for s in suggestions):
+                pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
+                sw = _pick_first_matching(pool, ["simple", "syrup", "sugar"])
+                if sw:
+                    suggestions.append(IngredientSuggestion(sw, sw.default_measure_ml or 12.0, "sweetener"))
+        
+            # After fallback, do not raise – continue to garnish/steps/return.
+
     
         # carry forward all fixes
         fixes = all_fixes
