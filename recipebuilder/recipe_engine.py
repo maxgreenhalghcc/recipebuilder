@@ -2911,55 +2911,55 @@ def generate_cocktail_recipe(
     )
 
 
-def _build_steps(
-    recipe_name: str,
-    suggestions: Sequence[IngredientSuggestion],
-    glassware: str,
-    ice: str,
-    garnish: Optional[str],
-    lengthener_note: Optional[str],
-    carbonation_texture: str = "",
-    foam_toggle: str = "no",
-) -> List[str]:
-    """
-    Build method steps based on:
-    - carbonation_texture (still vs fizzy)
-    - foam_toggle (YES => shaken build, but no foaming agent required)
-    - glassware (martini/coupe => up serve)
-    - mixer presence / lengthener_note
-    """
-    steps: List[str] = []
-
-    g = (glassware or "").lower()
-    carb = (carbonation_texture or "").strip().lower()
-    foam = (foam_toggle or "").strip().lower()
-
-    is_up = ("martini" in g) or ("coupe" in g)
-    is_still = carb.startswith("still")
-    wants_fizzy = carb.startswith("light") or carb.startswith("proper") or "spark" in carb
-
-    # Identify mixer suggestion (if any)
-    mixer = next((s for s in suggestions if s.role == "mixer"), None)
-
-    # If we have a mixer, treat as fizzy unless explicitly still
-    if mixer and not is_still:
-        wants_fizzy = True
-
-    # Helper: separate "shake set" ingredients (everything except mixer)
-    shake_set = [s for s in suggestions if s.role != "mixer"]
-    # If caller uses lengthener_note for top-up, keep it as additional instruction
-
-    # --- UP / MARTINI STYLE ---
-    if is_up:
-        steps.append(f"Chill the {glassware.lower()}.")
-        steps.append("Add all ingredients to a shaker with cubed ice and shake hard (10–12 seconds).")
-        steps.append(f"Fine strain into the chilled {glassware.lower()}.")
-        if garnish:
-            steps.append(f"Garnish with {garnish.lower()}.")
-        if lengthener_note:
-            steps.append(lengthener_note)
-        steps.append("Serve immediately.")
-        return steps
+    def _build_steps(
+        recipe_name: str,
+        suggestions: Sequence[IngredientSuggestion],
+        glassware: str,
+        ice: str,
+        garnish: Optional[str],
+        lengthener_note: Optional[str],
+        carbonation_texture: str = "",
+        foam_toggle: str = "no",
+    ) -> List[str]:
+        """
+        Build method steps based on:
+        - carbonation_texture (still vs fizzy)
+        - foam_toggle (YES => shaken build, but no foaming agent required)
+        - glassware (martini/coupe => up serve)
+        - mixer presence / lengthener_note
+        """
+        steps: List[str] = []
+    
+        g = (glassware or "").lower()
+        carb = (carbonation_texture or "").strip().lower()
+        foam = (foam_toggle or "").strip().lower()
+    
+        is_up = ("martini" in g) or ("coupe" in g)
+        is_still = carb.startswith("still")
+        wants_fizzy = carb.startswith("light") or carb.startswith("proper") or "spark" in carb
+    
+        # Identify mixer suggestion (if any)
+        mixer = next((s for s in suggestions if s.role == "mixer"), None)
+    
+        # If we have a mixer, treat as fizzy unless explicitly still
+        if mixer and not is_still:
+            wants_fizzy = True
+    
+        # Helper: separate "shake set" ingredients (everything except mixer)
+        shake_set = [s for s in suggestions if s.role != "mixer"]
+        # If caller uses lengthener_note for top-up, keep it as additional instruction
+    
+        # --- UP / MARTINI STYLE ---
+        if is_up:
+            steps.append(f"Chill the {glassware.lower()}.")
+            steps.append("Add all ingredients to a shaker with cubed ice and shake hard (10–12 seconds).")
+            steps.append(f"Fine strain into the chilled {glassware.lower()}.")
+            if garnish:
+                steps.append(f"Garnish with {garnish.lower()}.")
+            if lengthener_note:
+                steps.append(lengthener_note)
+            steps.append("Serve immediately.")
+            return steps
 
     # --- STILL & SILKY (always shaken, no top) ---
     if is_still:
