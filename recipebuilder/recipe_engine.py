@@ -2876,7 +2876,7 @@ def generate_cocktail_recipe(
     if lengthener_note:
         explanations.append("Lengthener guidance included to reach glass volume without diluting balance.")
 
-   steps = _build_steps(
+    steps = _build_steps(
         name, suggestions, glassware, ice, garnish, lengthener_note,
         carbonation_texture=(responses.get("carbonation_texture") or ""),
         foam_toggle=(responses.get("foam_toggle") or "no"),
