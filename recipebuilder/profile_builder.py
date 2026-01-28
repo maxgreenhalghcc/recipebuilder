@@ -1309,6 +1309,19 @@ class ProfileRecipeBuilder:
                     return cand.name
 
         return gchoices[0].name
+        
+    def _select_foam_agent(self, responses: Dict[str, Any], profile: str) -> Optional[StockItem]:
+        # Respect "egg" allergen / no-foam requests
+        allergens = (responses.get("allergens") or "").lower()
+        if "egg" in allergens or "no-foam" in allergens:
+            return None
+    
+        pool = self.repository.neutral_items(role="modifier") + self.repository.items_for_profile(profile, role="modifier")
+        # try vegan first, then egg white
+        agent = _pick_first_matching(pool, ["aquafaba", "vegan foamer", "foamer", "foam"])
+        if agent:
+            return agent
+        return _pick_first_matching(pool, ["egg white", "eggwhite"])
 
     def _build_steps_guardrailed(
         self,
@@ -1317,24 +1330,47 @@ class ProfileRecipeBuilder:
         suggestions: Sequence[IngredientSuggestion],
     ) -> List[str]:
         carbonation = (responses.get("carbonation_texture") or "").strip().lower()
+        foam_toggle = (responses.get("foam_toggle") or "").strip().lower()
         is_martini = self._is_martini_style_glass(glass.name)
-
+    
         mixer = next((s for s in suggestions if s.role == "mixer"), None)
-
+    
+        has_foam_agent = any(
+            any(tok in s.ingredient.name.lower() for tok in ("aquafaba", "egg white", "eggwhite", "foamer", "foam"))
+            for s in suggestions
+        )
+    
+        # Martini/up serves
         if is_martini:
+            if foam_toggle == "yes" and has_foam_agent:
+                return [
+                    "Dry shake (no ice) hard to build foam.",
+                    "Add ice and shake again (wet shake).",
+                    f"Strain into a chilled {glass.name}.",
+                    "Garnish and serve.",
+                ]
             return [
                 "Add ingredients to a shaker with ice and shake hard.",
                 f"Strain into a chilled {glass.name}.",
                 "Garnish and serve.",
             ]
-
+    
+        # Still & silky: no top, usually shaken
         if carbonation.startswith("still"):
+            if foam_toggle == "yes" and has_foam_agent:
+                return [
+                    "Dry shake (no ice) hard to build foam.",
+                    "Add ice and shake again (wet shake).",
+                    f"Strain into an ice-filled {glass.name}.",
+                    "Garnish and serve.",
+                ]
             return [
                 "Add ingredients to a shaker with ice and shake hard.",
                 f"Strain into an ice-filled {glass.name}.",
                 "Garnish and serve.",
             ]
-
+    
+        # Fizzy builds: build + top
         steps = [
             f"Fill a {glass.name} with cubed ice.",
             "Add spirits, syrups, juices and sour. Give a brief stir.",
@@ -1343,6 +1379,7 @@ class ProfileRecipeBuilder:
             steps.append(f"Top with {mixer.ingredient.name}.")
         steps.append("Garnish and serve.")
         return steps
+
         
     def _critic(self, template: str, suggestions: List[IngredientSuggestion]) -> List[str]:
         rules = TEMPLATE_RULES.get(template, TEMPLATE_RULES["SOUR"])
@@ -1377,7 +1414,7 @@ class ProfileRecipeBuilder:
         return fails
     
     
-    def _repair(
+   def _repair(
         self,
         template: str,
         responses: Dict[str, Any],
@@ -1392,12 +1429,52 @@ class ProfileRecipeBuilder:
         allows_mixer = bool(rules["allows_mixer"])
         one_sour = bool(rules["one_sour"])
     
+        aroma = (responses.get("aroma_preference") or "").strip().lower()
+        sweet_style = (responses.get("sweetener_question") or "").strip().lower()
+        carbonation = (responses.get("carbonation_texture") or "").strip().lower()
+        foam_toggle = (responses.get("foam_toggle") or "").strip().lower()
+    
+        # -------------------------
+        # Step 3: Foam contract
+        # -------------------------
+        if foam_toggle == "yes":
+            # add foam agent if not already present
+            has_agent = any(
+                any(tok in s.ingredient.name.lower() for tok in ("aquafaba", "egg white", "eggwhite", "foamer", "foam"))
+                for s in suggestions
+            )
+            if not has_agent:
+                agent = self._select_foam_agent(responses, profile)
+                if agent:
+                    # typical: 15ml aquafaba or equivalent foamer, egg white handled similarly
+                    suggestions.append(IngredientSuggestion(agent, agent.default_measure_ml or 15.0, "modifier"))
+                    fixes.append("ADDED_FOAM_AGENT")
+                else:
+                    fixes.append("FOAM_UNAVAILABLE_FELL_BACK")
+    
         # 1) Remove mixer if not allowed
         if not allows_mixer:
             before = len(suggestions)
             suggestions[:] = [s for s in suggestions if s.role != "mixer"]
             if len(suggestions) != before:
                 fixes.append("REMOVED_MIXER")
+    
+        # -------------------------
+        # Step 4 Rule C: Carbonation must show
+        # -------------------------
+        wants_fizzy = carbonation.startswith("light") or carbonation.startswith("proper")
+        has_mixer = any(s.role == "mixer" for s in suggestions)
+    
+        if wants_fizzy and allows_mixer and not has_mixer:
+            pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+            # properly fizzy: prefer soda/tonic/ginger; lightly: soda/lemonade
+            if carbonation.startswith("proper"):
+                m = _pick_first_matching(pool, ["soda", "tonic", "ginger", "lemonade", "sparkling"])
+            else:
+                m = _pick_first_matching(pool, ["soda", "lemonade", "ginger"])
+            if m:
+                suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 75.0, "mixer"))
+                fixes.append("INJECTED_MIXER_FOR_CARBONATION")
     
         # 2) Ensure sour exists if required
         if requires_sour and not any(s.role == "sour" for s in suggestions):
@@ -1424,6 +1501,52 @@ class ProfileRecipeBuilder:
                     fixes.append("CAPPED_SOUR_WITH_CORDIAL")
                     break
     
+        # -------------------------
+        # Step 4 Rule A: Sweetener gating
+        # -------------------------
+        def swap_sweetener(prefer: List[str], ban: List[str], tag: str) -> None:
+            nonlocal fixes
+            sweeteners = [s for s in suggestions if s.role == "sweetener"]
+            if not sweeteners:
+                return
+            # if current sweetener is banned, remove it and replace
+            if any(any(b in s.ingredient.name.lower() for b in ban) for s in sweeteners):
+                suggestions[:] = [s for s in suggestions if s.role != "sweetener"]
+                pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
+                repl = _pick_first_matching(pool, prefer)
+                if repl:
+                    suggestions.append(IngredientSuggestion(repl, repl.default_measure_ml or 12.0, "sweetener"))
+                    fixes.append(tag)
+    
+        if "wood" in aroma or "woody" in aroma:
+            swap_sweetener(
+                prefer=["maple", "honey", "demerara", "simple", "syrup", "sugar"],
+                ban=["strawberry", "rasp", "blue", "bubblegum", "midori", "grenadine"],
+                tag="WOODY_SWEETENER_SWAP",
+            )
+    
+        if sweet_style == "zesty":
+            # prefer citrus-forward sweeteners; if we don't have one, keep neutral simple
+            swap_sweetener(
+                prefer=["lime cordial", "lemon", "elderflower", "simple", "syrup", "sugar"],
+                ban=["maple", "honey", "caramel", "toffee", "vanilla", "bubblegum", "grenadine"],
+                tag="ZESTY_SWEETENER_SWAP",
+            )
+    
+        # -------------------------
+        # Step 4 Rule B: Cranberry + grenadine ban
+        # -------------------------
+        has_cran = any(s.role == "juice" and "cranberry" in s.ingredient.name.lower() for s in suggestions)
+        has_gren = any(s.role == "sweetener" and "grenadine" in s.ingredient.name.lower() for s in suggestions)
+        if has_cran and has_gren:
+            # swap grenadine to neutral sweetener
+            suggestions[:] = [s for s in suggestions if not (s.role == "sweetener" and "grenadine" in s.ingredient.name.lower())]
+            pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
+            repl = _pick_first_matching(pool, ["simple", "maple", "honey", "syrup", "sugar"])
+            if repl:
+                suggestions.append(IngredientSuggestion(repl, repl.default_measure_ml or 12.0, "sweetener"))
+            fixes.append("SWAPPED_GRENADINE_WITH_CRANBERRY")
+    
         # 5) Cap juice count: drop lowest-priority juices
         juices = [s for s in suggestions if s.role == "juice"]
         if len(juices) > max_juices:
@@ -1442,6 +1565,7 @@ class ProfileRecipeBuilder:
             fixes.append("DROPPED_EXTRA_JUICE")
     
         return fixes
+
     
     def _apply_guardrails(
         self,
