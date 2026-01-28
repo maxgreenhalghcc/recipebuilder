@@ -2431,7 +2431,6 @@ def _apply_template_guidance(
     final_issues["similarity"] = similarity
     return final_issues
 
-
 def generate_cocktail_recipe(
     responses: Dict[str, Optional[str]],
     *,
@@ -2914,42 +2913,82 @@ def _build_steps(
     ice: str,
     garnish: Optional[str],
     lengthener_note: Optional[str],
+    carbonation_texture: str = "",
+    foam_toggle: str = "no",
 ) -> List[str]:
+    """
+    Build method steps based on:
+    - carbonation_texture (still vs fizzy)
+    - foam_toggle (YES => shaken build, but no foaming agent required)
+    - glassware (martini/coupe => up serve)
+    - mixer presence / lengthener_note
+    """
     steps: List[str] = []
-    mixing_vessel = "shaker"
-    base = suggestions[0] if suggestions else None
-    if base and base.ingredient.category.lower() == "spirit":
-        steps.append(
-            f"Chill the {glassware.lower()} and ready a {mixing_vessel}."
-        )
+
+    g = (glassware or "").lower()
+    carb = (carbonation_texture or "").strip().lower()
+    foam = (foam_toggle or "").strip().lower()
+
+    is_up = ("martini" in g) or ("coupe" in g)
+    is_still = carb.startswith("still")
+    wants_fizzy = carb.startswith("light") or carb.startswith("proper") or "spark" in carb
+
+    # Identify mixer suggestion (if any)
+    mixer = next((s for s in suggestions if s.role == "mixer"), None)
+
+    # If we have a mixer, treat as fizzy unless explicitly still
+    if mixer and not is_still:
+        wants_fizzy = True
+
+    # Helper: separate "shake set" ingredients (everything except mixer)
+    shake_set = [s for s in suggestions if s.role != "mixer"]
+    # If caller uses lengthener_note for top-up, keep it as additional instruction
+
+    # --- UP / MARTINI STYLE ---
+    if is_up:
+        steps.append(f"Chill the {glassware.lower()}.")
+        steps.append("Add all ingredients to a shaker with cubed ice and shake hard (10–12 seconds).")
+        steps.append(f"Fine strain into the chilled {glassware.lower()}.")
+        if garnish:
+            steps.append(f"Garnish with {garnish.lower()}.")
+        if lengthener_note:
+            steps.append(lengthener_note)
+        steps.append("Serve immediately.")
+        return steps
+
+    # --- STILL & SILKY (always shaken, no top) ---
+    if is_still:
+        steps.append(f"Fill a {glassware.lower()} with {ice.lower()}.")
+        steps.append("Add all ingredients to a shaker with cubed ice and shake hard (10–12 seconds).")
+        steps.append(f"Strain into the ice-filled {glassware.lower()}.")
+        if garnish:
+            steps.append(f"Garnish with {garnish.lower()}.")
+        if lengthener_note:
+            steps.append(lengthener_note)
+        steps.append("Serve immediately.")
+        return steps
+
+    # --- FIZZY DRINKS ---
+    steps.append(f"Fill a {glassware.lower()} with {ice.lower()}.")
+
+    # Foam toggle = shaken build (but no foaming agent required)
+    if foam == "yes":
+        steps.append("Add all ingredients (except the mixer) to a shaker with cubed ice and shake hard (10–12 seconds).")
+        steps.append(f"Strain into the ice-filled {glassware.lower()}.")
     else:
-        steps.append(f"Prepare the {glassware.lower()} with {ice.lower()}.")
+        # Default fizzy build: build in glass (more service-friendly)
+        steps.append("Add spirits, syrups, juices and sour to the glass. Give a brief stir.")
 
-    for suggestion in suggestions:
-        steps.append(
-            f"Add {suggestion.amount_ml:.0f} ml {suggestion.ingredient.name}"
-            + (f" ({suggestion.role})" if suggestion.role != "base" else "")
-            + " to the shaker with ice."
-        )
-
-    steps.append("Shake vigorously for 10-12 seconds and fine strain into the chilled glass.")
-    steps.append(f"Serve over {ice.lower()} in the {glassware.lower()}.")
-
-    syrup_names = [
-        s.ingredient.name
-        for s in suggestions
-        if s.role == "sweetener" and _normalize(s.ingredient.category) in {"syrup", "sweetener"}
-    ]
-    if syrup_names:
-        steps.append(
-            f"Drizzle {syrup_names[0].lower()} over the top for colour contrast before serving."
-        )
+    # Top-up if we have a mixer
+    if mixer:
+        steps.append(f"Top with {mixer.ingredient.name}.")
+    elif wants_fizzy and lengthener_note:
+        # If caller passed a lengthener note but no mixer object exists
+        steps.append(lengthener_note)
 
     if garnish:
-        steps.append(f"Garnish with {garnish.lower()} just before serving.")
-    if lengthener_note:
-        steps.append(lengthener_note)
-    steps.append("Present immediately and share the flavour story with the guest.")
+        steps.append(f"Garnish with {garnish.lower()}.")
+    steps.append("Serve immediately.")
     return steps
 
 
