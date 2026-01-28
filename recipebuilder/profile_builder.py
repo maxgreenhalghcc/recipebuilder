@@ -71,6 +71,17 @@ TEMPLATE_SPECS: Dict[str, Dict[str, Any]] = {
     "TIKI_SHAKEN": {"needs_sour": True, "needs_mixer": False, "max_juices": 3, "allow_foam": False},
 }
 
+TEMPLATE_RULES: Dict[str, Dict[str, Any]] = {
+    "SOUR_FOAMY": {"min_components": 6, "max_juices": 1, "requires_sour": True, "allows_mixer": False, "one_sour": True},
+    "SOUR": {"min_components": 5, "max_juices": 1, "requires_sour": True, "allows_mixer": False, "one_sour": True},
+    "COLLINS": {"min_components": 5, "max_juices": 2, "requires_sour": True, "allows_mixer": True, "one_sour": True},
+    "HIGHBALL": {"min_components": 5, "max_juices": 2, "requires_sour": True, "allows_mixer": True, "one_sour": True},
+    "SPRITZ": {"min_components": 4, "max_juices": 1, "requires_sour": False, "allows_mixer": True, "one_sour": False},
+    "MARTINI_UP": {"min_components": 3, "max_juices": 0, "requires_sour": False, "allows_mixer": False, "one_sour": False},
+    "OLD_FASHIONED": {"min_components": 3, "max_juices": 0, "requires_sour": False, "allows_mixer": False, "one_sour": False},
+    "TIKI_SHAKEN": {"min_components": 6, "max_juices": 3, "requires_sour": True, "allows_mixer": False, "one_sour": True},
+}
+
 
 
 @dataclass
@@ -1332,7 +1343,106 @@ class ProfileRecipeBuilder:
             steps.append(f"Top with {mixer.ingredient.name}.")
         steps.append("Garnish and serve.")
         return steps
-
+        
+    def _critic(self, template: str, suggestions: List[IngredientSuggestion]) -> List[str]:
+        rules = TEMPLATE_RULES.get(template, TEMPLATE_RULES["SOUR"])
+        fails: List[str] = []
+    
+        min_components = int(rules["min_components"])
+        max_juices = int(rules["max_juices"])
+        requires_sour = bool(rules["requires_sour"])
+        allows_mixer = bool(rules["allows_mixer"])
+        one_sour = bool(rules["one_sour"])
+    
+        juices = [s for s in suggestions if s.role == "juice"]
+        sours = [s for s in suggestions if s.role == "sour"]
+        mixers = [s for s in suggestions if s.role == "mixer"]
+    
+        if len(suggestions) < min_components:
+            fails.append("UNDERBUILT")
+        if len(juices) > max_juices:
+            fails.append("TOO_MANY_JUICES")
+        if requires_sour and len(sours) == 0:
+            fails.append("MISSING_SOUR")
+        if one_sour and len(sours) > 1:
+            fails.append("MULTIPLE_SOUR_SOURCES")
+        if (not allows_mixer) and mixers:
+            fails.append("MIXER_NOT_ALLOWED")
+    
+        # cordial stacking: any cordial + any sour
+        names = " ".join(s.ingredient.name.lower() for s in suggestions)
+        if "cordial" in names and len(sours) > 0:
+            fails.append("CORDIAL_STACKING")
+    
+        return fails
+    
+    
+    def _repair(
+        self,
+        template: str,
+        responses: Dict[str, Any],
+        profile: str,
+        suggestions: List[IngredientSuggestion],
+    ) -> List[str]:
+        rules = TEMPLATE_RULES.get(template, TEMPLATE_RULES["SOUR"])
+        fixes: List[str] = []
+    
+        max_juices = int(rules["max_juices"])
+        requires_sour = bool(rules["requires_sour"])
+        allows_mixer = bool(rules["allows_mixer"])
+        one_sour = bool(rules["one_sour"])
+    
+        # 1) Remove mixer if not allowed
+        if not allows_mixer:
+            before = len(suggestions)
+            suggestions[:] = [s for s in suggestions if s.role != "mixer"]
+            if len(suggestions) != before:
+                fixes.append("REMOVED_MIXER")
+    
+        # 2) Ensure sour exists if required
+        if requires_sour and not any(s.role == "sour" for s in suggestions):
+            pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
+            sour = _pick_first_matching(pool, ["lemon", "lime"])
+            if sour:
+                suggestions.append(IngredientSuggestion(sour, sour.default_measure_ml or 15.0, "sour"))
+                fixes.append("INJECTED_SOUR")
+    
+        # 3) If multiple sours, keep one (prefer lemon)
+        if one_sour:
+            sours = [s for s in suggestions if s.role == "sour"]
+            if len(sours) > 1:
+                keep = next((s for s in sours if "lemon" in s.ingredient.name.lower()), sours[0])
+                suggestions[:] = [s for s in suggestions if s.role != "sour" or s is keep]
+                fixes.append("REDUCED_SOUR_TO_ONE")
+    
+        # 4) Cordial stacking: cap sour to 10ml if cordial exists
+        names = " ".join(s.ingredient.name.lower() for s in suggestions)
+        if "cordial" in names:
+            for s in suggestions:
+                if s.role == "sour":
+                    s.amount_ml = min(s.amount_ml, 10.0)
+                    fixes.append("CAPPED_SOUR_WITH_CORDIAL")
+                    break
+    
+        # 5) Cap juice count: drop lowest-priority juices
+        juices = [s for s in suggestions if s.role == "juice"]
+        if len(juices) > max_juices:
+            def drop_priority(sug: IngredientSuggestion) -> int:
+                n = sug.ingredient.name.lower()
+                # higher number = more likely to drop
+                if "apple" in n: return 100
+                if "orange" in n: return 80
+                if "pineapple" in n: return 60
+                if "cranberry" in n: return 40
+                return 70
+    
+            juices_sorted = sorted(juices, key=drop_priority, reverse=True)
+            to_drop = juices_sorted[: len(juices) - max_juices]
+            suggestions[:] = [s for s in suggestions if s not in to_drop]
+            fixes.append("DROPPED_EXTRA_JUICE")
+    
+        return fixes
+    
     def _apply_guardrails(
         self,
         responses: Dict[str, Any],
@@ -1342,50 +1452,49 @@ class ProfileRecipeBuilder:
     ) -> tuple[Glass, List[IngredientSuggestion], str, List[str], List[str]]:
         fixes: List[str] = []
         reasons: List[str] = []
-
+    
         carbonation = (responses.get("carbonation_texture") or "").strip().lower()
         aroma = (responses.get("aroma_preference") or "").strip().lower()
-        
         is_martini = self._is_martini_style_glass(glass.name)
-        
+    
         # TEMPLATE ENFORCEMENT (template-first)
         template = select_template(responses)
         spec = TEMPLATE_SPECS[template]
-        
+    
         # If template says no mixer, strip it
         if not spec["needs_mixer"]:
             suggestions, removed = self._remove_mixers(suggestions)
             if removed:
                 fixes.append("REMOVED_MIXER_FOR_TEMPLATE")
-
-
+    
         # 1) Still & silky must not have carbonated mixers
         if carbonation.startswith("still"):
             suggestions, removed = self._remove_mixers(suggestions)
             if removed:
                 fixes.append("REMOVED_MIXER_FOR_STILL")
-
+    
         # 2) Martini rules: no top (always shaken)
         if is_martini:
             suggestions, removed = self._remove_mixers(suggestions)
             if removed:
                 fixes.append("REMOVED_MIXER_FOR_MARTINI")
-
+    
         # 3) Minimum viable cocktail (>=5 components) with autofill
+        # (keep this as a fast first-pass; critic/repair will also enforce)
         if self._count_components(suggestions) < 5:
             fixes.append("UNDERBUILT_AUTOFILL")
-
+    
             has_juice = any(s.role == "juice" for s in suggestions)
             has_sour = any(s.role == "sour" for s in suggestions)
             has_sweet = any(s.role == "sweetener" for s in suggestions)
-
+    
             if not has_juice and not has_sour:
                 pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
                 fallback = _pick_first_matching(pool, ["orange", "apple", "cranberry", "pineapple"])
                 if fallback:
                     suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
                     fixes.append("ADDED_CORE_JUICE")
-
+    
             has_sour = any(s.role == "sour" for s in suggestions)
             if has_sweet and not has_sour:
                 pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
@@ -1393,32 +1502,45 @@ class ProfileRecipeBuilder:
                 if fallback:
                     suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 15.0, "sour"))
                     fixes.append("ADDED_CORE_SOUR")
-
+    
         # 4) Woody coherence (simple ban-list)
         if "wood" in aroma or "woody" in aroma:
             banned = ("malibu", "passion", "pineapple syrup", "bubblegum", "midori")
             if any(b in s.ingredient.name.lower() for s in suggestions for b in banned):
                 reasons.append("WOODY_TROPICAL_CONFLICT")
-
-        # Final rejection if still bad
-        if self._count_components(suggestions) < 5:
-            reasons.append("UNDERBUILT")
-
+    
+        # -----------------------------
+        # STEP 2: validate -> repair -> validate (template-aware)
+        # -----------------------------
+        all_fixes: List[str] = list(fixes)
+    
+        for _ in range(3):
+            fails = self._critic(template, suggestions)
+            if not fails:
+                break
+            all_fixes += self._repair(template, responses, profile, suggestions)
+    
+        fails = self._critic(template, suggestions)
+        if fails:
+            # critic failures are hard reject reasons
+            raise GuardrailReject(reasons=fails, fixes=all_fixes)
+    
+        # carry forward all fixes
+        fixes = all_fixes
+    
+        # If woody conflict detected, still reject (this is a "personalisation" fail not a balance fail)
+        if reasons:
+            raise GuardrailReject(reasons=reasons, fixes=fixes)
+    
         garnish_items = self.repository.items_for_profile(profile, role="garnish")
         garnish = self._pick_garnish_guardrailed(responses, profile, garnish_items, suggestions)
         if garnish == "" and garnish_items:
             garnish = garnish_items[0].name
-
+    
         steps = self._build_steps_guardrailed(glass, responses, suggestions)
-
-        if reasons:
-            raise GuardrailReject(reasons=reasons, fixes=fixes)
-
+    
         return glass, suggestions, garnish, steps, fixes
 
-    # -----------------------------
-    # Existing validator + fallback logic
-    # -----------------------------
 
     def _validate(
         self,
