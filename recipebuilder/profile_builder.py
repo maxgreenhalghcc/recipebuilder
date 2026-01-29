@@ -1681,7 +1681,7 @@ class ProfileRecipeBuilder:
                     break
                 all_fixes += self._repair(template, responses, profile, suggestions)
         
-           fails = self._critic(template, suggestions)
+        fails = self._critic(template, suggestions)
             if fails:
                 # BULLETPROOF: never error. Force a safe structure and continue.
                 fixes.append("FALLBACK_SAFE_STRUCTURE")
