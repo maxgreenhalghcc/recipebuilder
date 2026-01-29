@@ -1681,33 +1681,45 @@ class ProfileRecipeBuilder:
                     break
                 all_fixes += self._repair(template, responses, profile, suggestions)
         
-            fails = self._critic(template, suggestions)
+           fails = self._critic(template, suggestions)
             if fails:
-                all_fixes.append("FALLBACK_SAFE_SOUR")
-        
-                # Strip mixer always
-                suggestions[:] = [s for s in suggestions if s.role != "mixer"]
-        
-                # Ensure at least one juice (length/body)
+                # BULLETPROOF: never error. Force a safe structure and continue.
+                fixes.append("FALLBACK_SAFE_STRUCTURE")
+                # If fizzy requested but no mixers exist, we still return a drink (and you can add warning later).
+            
+                # 1) If still or martini, ensure no mixer
+                if carbonation.startswith("still") or is_martini:
+                    suggestions, _ = self._remove_mixers(suggestions)
+            
+                # 2) Ensure at least one juice for body
                 if not any(s.role == "juice" for s in suggestions):
                     pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
-                    j = _pick_first_matching(pool, ["orange", "apple", "cranberry"])
+                    j = _pick_first_matching(pool, ["apple", "cranberry", "orange"])
                     if j:
                         suggestions.append(IngredientSuggestion(j, j.default_measure_ml or 30.0, "juice"))
-        
-                # Ensure sour (balance)
+            
+                # 3) Ensure sour
                 if not any(s.role == "sour" for s in suggestions):
                     pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
-                    s = _pick_first_matching(pool, ["lemon", "lime"])
-                    if s:
-                        suggestions.append(IngredientSuggestion(s, s.default_measure_ml or 15.0, "sour"))
-        
-                # Ensure sweetener if still underbuilt
-                if self._count_components(suggestions) < 5 and not any(s.role == "sweetener" for s in suggestions):
+                    s_item = _pick_first_matching(pool, ["lemon", "lime"])
+                    if s_item:
+                        suggestions.append(IngredientSuggestion(s_item, s_item.default_measure_ml or 15.0, "sour"))
+            
+                # 4) Ensure sweetener
+                if not any(s.role == "sweetener" for s in suggestions):
                     pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
-                    sw = _pick_first_matching(pool, ["simple", "syrup", "sugar"])
+                    sw = _pick_first_matching(pool, ["simple", "syrup", "sugar", "maple"])
                     if sw:
                         suggestions.append(IngredientSuggestion(sw, sw.default_measure_ml or 12.0, "sweetener"))
+            
+                # 5) If fizzy requested, try inject mixer (but don't fail if none exists)
+                if (carbonation.startswith("light") or carbonation.startswith("proper")) and not any(s.role == "mixer" for s in suggestions):
+                    pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+                    m = _pick_first_matching(pool, ["soda", "lemonade", "ginger", "tonic", "sparkling"])
+                    if m:
+                        suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 75.0, "mixer"))
+                        fixes.append("INJECTED_MIXER_FOR_CARBONATION")
+
         
             fixes = all_fixes
         
