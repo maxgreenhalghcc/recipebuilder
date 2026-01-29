@@ -8,6 +8,7 @@ import re
 from collections import deque
 from pathlib import Path
 from typing import Any, Deque, Dict, FrozenSet, Hashable, Optional, Tuple
+import traceback; traceback.print_exc()
 
 from flask import Flask, Response, jsonify, request
 
