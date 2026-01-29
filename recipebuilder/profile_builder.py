@@ -1646,6 +1646,25 @@ class ProfileRecipeBuilder:
                 fixes.append("REMOVED_TROPICAL_FOR_WOODY")
 
     
+        # Hard floor: still/sour templates must be at least 5 components (no 3-ingredient drinks)
+        template = select_template(responses)  # you already have this earlier
+        if (carbonation.startswith("still") or template in {"SOUR", "SOUR_FOAMY"}) and self._count_components(suggestions) < 5:
+            pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+            # Prefer body juices that fit woody/autumn
+            j = _pick_first_matching(pool, ["apple", "cranberry", "orange"])
+            if j:
+                suggestions.append(IngredientSuggestion(j, j.default_measure_ml or 30.0, "juice"))
+                fixes.append("ADDED_BODY_JUICE_FOR_COMPLETENESS")
+        
+            # If still under 5, add a modifier (if available)
+            if self._count_components(suggestions) < 5:
+                pool = self.repository.neutral_items(role="modifier") + self.repository.items_for_profile(profile, role="modifier")
+                m = _pick_first_matching(pool, ["bitters", "liqueur", "vermouth", "amaro", "ginger"])
+                if m:
+                    suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 15.0, "modifier"))
+                    fixes.append("ADDED_MODIFIER_FOR_COMPLETENESS")
+
+        
         # -----------------------------
         # STEP 2: validate -> repair -> validate (template-aware)
         # -----------------------------
