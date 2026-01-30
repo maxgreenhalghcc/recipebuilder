@@ -117,7 +117,7 @@ FAMILY_BANS: Dict[str, Tuple[str, ...]] = {
     ),
     "FLORAL_ELEGANT": (
         "bubblegum", "banana", "coconut syrup", "melon", "midori",
-        "marshmallow", "caramel", "candy", "watermelon",
+        "marshmallow", "caramel", "candy", "watermelon", "peach schnapps",
     ),
     "DESSERT_INDULGENT": (
         # Permissive - just avoid raw tart clashes
@@ -415,7 +415,9 @@ def choose_profile(responses: Dict[str, Any]) -> str:
         scores["citrus_fresh"] += 3
         scores["tropical"] += 1
     if "campfire" in aroma or "wood" in aroma:
-        scores["classic_boozy"] += 3
+        scores["classic_boozy"] += 5  # Strong signal for woody profiles
+        scores["tropical"] -= 2  # Woody conflicts with tropical vibes
+        scores["candy_fun"] -= 2
     if "floral" in aroma:
         scores["berry"] += 3
         scores["citrus_fresh"] += 1
@@ -890,12 +892,22 @@ class ProfileRecipeBuilder:
         if mixer_item and mixer_ml > 0:
             suggestions.append(IngredientSuggestion(mixer_item, mixer_ml, "mixer"))
 
-        # Keep your quick MVC safety net (guardrails will also enforce)
+        # HARD REQUIREMENT: Every cocktail MUST have a juice lengthener (not just sour)
+        # Profile-specific juice preferences for flavor coherence
+        PROFILE_JUICE_PRIORITY: Dict[str, List[str]] = {
+            "tropical": ["pineapple", "passion", "orange", "mango"],
+            "citrus_fresh": ["orange", "grapefruit", "cranberry", "lemon"],
+            "berry": ["cranberry", "raspberry", "strawberry", "orange"],
+            "classic_boozy": ["orange", "grapefruit", "apple", "cranberry"],
+            "candy_fun": ["cranberry", "orange", "pineapple", "apple"],
+            "dessert": ["passion", "pineapple", "orange", "apple"],
+        }
+
         has_juice = any(s.role == "juice" for s in suggestions)
-        has_sour = any(s.role == "sour" for s in suggestions)
-        if (not has_juice) and (not has_sour):
+        if not has_juice:
             fallback_pool = self.repository.neutral_items(role="juice") + profile_items("juice")
-            fallback = _pick_first_matching(fallback_pool, ["orange", "apple", "cranberry"])
+            juice_priority = PROFILE_JUICE_PRIORITY.get(profile, ["orange", "apple", "cranberry", "pineapple"])
+            fallback = _pick_first_matching(fallback_pool, juice_priority)
             if fallback:
                 suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
 
@@ -1073,12 +1085,23 @@ class ProfileRecipeBuilder:
         def subtype_score(item: StockItem) -> float:
             subtype = getattr(item, "spirit_subtype", None) or ""
             family = extract_spirit_family(item.name) or ""
+            aroma = (responses.get("aroma_preference") or "").lower()
             score = 0.0
             if family == "rum":
-                if subtype in {"spiced", "dark", "anejo"}:
-                    score += 2.0 if profile in {"tropical", "dessert", "candy_fun", "classic_boozy"} else 1.0
-                if subtype in {"light"}:
-                    score += 2.0 if profile in {"citrus_fresh", "berry"} else 0.5
+                # For woody/autumn profiles, strongly prefer spiced rum
+                if "wood" in aroma or "campfire" in aroma or profile == "classic_boozy":
+                    if subtype == "spiced":
+                        score += 5.0  # Strong preference for spiced
+                    elif subtype in {"dark", "anejo"}:
+                        score += 3.0  # Good alternative
+                    elif subtype == "light":
+                        score += 0.5
+                else:
+                    # For tropical/summer profiles
+                    if subtype in {"spiced", "dark", "anejo"}:
+                        score += 2.0 if profile in {"tropical", "dessert", "candy_fun"} else 1.0
+                    if subtype in {"light"}:
+                        score += 2.0 if profile in {"citrus_fresh", "berry"} else 0.5
             return score
 
         if desired:
@@ -1479,57 +1502,103 @@ class ProfileRecipeBuilder:
         garnishes: Sequence[StockItem],
         suggestions: Sequence[IngredientSuggestion],
     ) -> str:
-        if not garnishes:
-            return ""
+        # Base spirit to garnish mapping (user preference: match to base spirit)
+        BASE_SPIRIT_GARNISH: Dict[str, List[str]] = {
+            "rum": ["lime", "mint", "pineapple", "orange"],
+            "gin": ["lemon", "cucumber", "lime", "rosemary"],
+            "vodka": ["lemon", "lime", "orange", "mint"],
+            "tequila": ["lime", "salt", "orange", "jalapeño"],
+            "whiskey": ["orange", "cherry", "lemon"],
+            "bourbon": ["orange", "cherry", "mint"],
+        }
 
-        gchoices = list(garnishes)
+        # Profile to garnish mapping
+        PROFILE_GARNISH: Dict[str, List[str]] = {
+            "tropical": ["pineapple", "orange", "mint", "lime"],
+            "citrus_fresh": ["lemon", "lime", "orange", "mint"],
+            "berry": ["raspberry", "strawberry", "berry", "mint", "lemon"],
+            "classic_boozy": ["orange", "cherry", "lemon"],
+            "candy_fun": ["cherry", "orange", "strawberry", "mint"],
+            "dessert": ["orange", "cherry", "mint", "pineapple"],
+        }
 
+        # Color matching for cocktail presentation
+        COLOR_GARNISH_MAP: Dict[str, List[str]] = {
+            "blue": ["orange", "lemon", "cherry"],  # contrast with blue
+            "violet": ["lemon", "orange", "mint"],
+            "red": ["raspberry", "strawberry", "cherry", "mint"],  # complement red
+            "pink": ["raspberry", "strawberry", "mint", "lemon"],
+            "orange": ["orange", "cherry", "mint"],
+            "yellow": ["pineapple", "lemon", "orange", "mint"],
+            "green": ["mint", "lime", "cucumber"],
+            "brown": ["orange", "cherry", "cinnamon"],  # woody/dark drinks
+        }
+
+        gchoices = list(garnishes) if garnishes else []
         names = " ".join((s.ingredient.name or "").lower() for s in suggestions)
 
-        # colour-ish cues (rough but works well in practice)
-        colour_priority: list[str] = []
+        # Detect cocktail color from ingredients
+        detected_color = None
         if any(t in names for t in ("blue", "curaçao", "curacao")):
-            colour_priority.append("blue")
-        if any(t in names for t in ("violet", "purple")):
-            colour_priority.append("violet")
-        if any(t in names for t in ("cranberry", "raspberry", "strawberry", "cherry", "grenadine")):
-            colour_priority.append("berry")
-        if any(t in names for t in ("mint", "lime", "kiwi")):
-            colour_priority.append("mint")
-        if any(t in names for t in ("pineapple", "passion", "mango")):
-            colour_priority.append("pineapple")
-        if "orange" in names:
-            colour_priority.append("orange")
-        if any(t in names for t in ("lemon", "lime")):
-            colour_priority.append("lemon")
+            detected_color = "blue"
+        elif any(t in names for t in ("violet", "purple")):
+            detected_color = "violet"
+        elif any(t in names for t in ("grenadine", "cranberry", "cherry")):
+            detected_color = "red"
+        elif any(t in names for t in ("raspberry", "strawberry")):
+            detected_color = "pink"
+        elif any(t in names for t in ("orange juice", "orange")):
+            detected_color = "orange"
+        elif any(t in names for t in ("pineapple", "passion", "mango")):
+            detected_color = "yellow"
+        elif any(t in names for t in ("mint", "midori", "kiwi")):
+            detected_color = "green"
+        elif any(t in names for t in ("bourbon", "whiskey", "dark rum", "spiced", "coffee", "caramel")):
+            detected_color = "brown"
 
-        aroma = (responses.get("aroma_preference") or "").strip().lower()
-        sweet_style = (responses.get("sweetener_question") or "").strip().lower()
-        carbonation = (responses.get("carbonation_texture") or "").strip().lower()
-
-        palette_priority: list[str] = []
-        if "fresh" in sweet_style or "zesty" in sweet_style or "citrus" in aroma:
-            palette_priority += ["mint", "lemon", "lime"]
-        if profile == "tropical":
-            palette_priority += ["pineapple", "orange", "mint"]
-        if "woody" in aroma or "wood" in aroma:
-            palette_priority += ["orange"]
-
-        has_juice = any(s.role == "juice" for s in suggestions)
-        if carbonation.startswith("still") and has_juice:
-            palette_priority = ["mint"] + palette_priority
-
+        # Build priority list
         priority: list[str] = []
-        for token in (colour_priority + palette_priority):
-            if token and token not in priority:
-                priority.append(token)
 
-        for tok in priority:
-            for cand in gchoices:
-                if tok in cand.name.lower():
-                    return cand.name
+        # 1. Color-based garnish (presentation)
+        if detected_color and detected_color in COLOR_GARNISH_MAP:
+            priority.extend(COLOR_GARNISH_MAP[detected_color])
 
-        return gchoices[0].name
+        # 2. Base spirit matching
+        base_spirit = (responses.get("base_spirit") or "").strip().lower()
+        if base_spirit in BASE_SPIRIT_GARNISH:
+            for g in BASE_SPIRIT_GARNISH[base_spirit]:
+                if g not in priority:
+                    priority.append(g)
+
+        # 3. Profile matching
+        if profile in PROFILE_GARNISH:
+            for g in PROFILE_GARNISH[profile]:
+                if g not in priority:
+                    priority.append(g)
+
+        # 4. Aroma/style adjustments
+        aroma = (responses.get("aroma_preference") or "").strip().lower()
+        if "woody" in aroma or "wood" in aroma:
+            priority = ["orange", "rosemary", "cherry"] + [p for p in priority if p not in ["orange", "rosemary", "cherry"]]
+        if "floral" in aroma:
+            priority = ["mint", "lemon", "edible flower"] + [p for p in priority if p not in ["mint", "lemon"]]
+
+        # Try to find a matching garnish from available pool
+        if gchoices:
+            for tok in priority:
+                for cand in gchoices:
+                    if tok in cand.name.lower():
+                        return cand.name
+            # If no match found, return first available
+            return gchoices[0].name
+
+        # FALLBACK: When no garnishes available in pool, return sensible default
+        # Based on base spirit or profile
+        if base_spirit in BASE_SPIRIT_GARNISH:
+            return BASE_SPIRIT_GARNISH[base_spirit][0].title() + " Twist"
+        if profile in PROFILE_GARNISH:
+            return PROFILE_GARNISH[profile][0].title() + " Twist"
+        return "Citrus Twist"  # Universal fallback
         
     def _select_foam_agent(self, responses: Dict[str, Any], profile: str) -> Optional[StockItem]:
         # Respect "egg" allergen / no-foam requests
@@ -1623,7 +1692,9 @@ class ProfileRecipeBuilder:
     
         if len(suggestions) < min_components:
             fails.append("UNDERBUILT")
-        if len(juices) > max_juices:
+        # IMPORTANT: Every recipe requires at least 1 juice, so only flag if > max(1, max_juices)
+        effective_max_juices = max(1, max_juices)
+        if len(juices) > effective_max_juices:
             fails.append("TOO_MANY_JUICES")
         if requires_sour and len(sours) == 0:
             fails.append("MISSING_SOUR")
@@ -1765,8 +1836,10 @@ class ProfileRecipeBuilder:
             fixes.append("SWAPPED_GRENADINE_WITH_CRANBERRY")
     
         # 5) Cap juice count: drop lowest-priority juices
+        # IMPORTANT: Never drop below 1 juice (juice is required for all recipes)
         juices = [s for s in suggestions if s.role == "juice"]
-        if len(juices) > max_juices:
+        effective_max = max(1, max_juices)  # Always keep at least 1 juice
+        if len(juices) > effective_max:
             def drop_priority(sug: IngredientSuggestion) -> int:
                 n = sug.ingredient.name.lower()
                 # higher number = more likely to drop
@@ -1775,9 +1848,9 @@ class ProfileRecipeBuilder:
                 if "pineapple" in n: return 60
                 if "cranberry" in n: return 40
                 return 70
-    
+
             juices_sorted = sorted(juices, key=drop_priority, reverse=True)
-            to_drop = juices_sorted[: len(juices) - max_juices]
+            to_drop = juices_sorted[: len(juices) - effective_max]
             suggestions[:] = [s for s in suggestions if s not in to_drop]
             fixes.append("DROPPED_EXTRA_JUICE")
 
@@ -1884,21 +1957,32 @@ class ProfileRecipeBuilder:
                     fixes.append("ADDED_MODIFIER_FOR_COMPLETENESS")
 
         # 3) Minimum viable cocktail (fast pass)
+        # Profile-specific juice preferences
+        GUARDRAIL_JUICE_PRIORITY: Dict[str, List[str]] = {
+            "tropical": ["pineapple", "passion", "orange", "mango"],
+            "citrus_fresh": ["orange", "grapefruit", "cranberry", "lemon"],
+            "berry": ["cranberry", "raspberry", "strawberry", "orange"],
+            "classic_boozy": ["orange", "grapefruit", "apple", "cranberry"],
+            "candy_fun": ["cranberry", "orange", "pineapple", "apple"],
+            "dessert": ["passion", "pineapple", "orange", "apple"],
+        }
+
+        # HARD REQUIREMENT: Every recipe MUST have juice (not optional)
+        has_juice = any(s.role == "juice" for s in suggestions)
+        if not has_juice:
+            pool = self._get_family_filtered_items(profile, "juice")
+            juice_priority = GUARDRAIL_JUICE_PRIORITY.get(profile, ["orange", "apple", "cranberry", "pineapple"])
+            fallback = _pick_first_matching(pool, juice_priority)
+            if fallback:
+                suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
+                fixes.append("ADDED_REQUIRED_JUICE_LENGTHENER")
+
         if self._count_components(suggestions) < 5:
             fixes.append("UNDERBUILT_AUTOFILL")
 
-            has_juice = any(s.role == "juice" for s in suggestions)
             has_sour = any(s.role == "sour" for s in suggestions)
             has_sweet = any(s.role == "sweetener" for s in suggestions)
 
-            if not has_juice and not has_sour:
-                pool = self._get_family_filtered_items(profile, "juice")
-                fallback = _pick_first_matching(pool, ["orange", "apple", "cranberry", "pineapple"])
-                if fallback:
-                    suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
-                    fixes.append("ADDED_CORE_JUICE")
-
-            has_sour = any(s.role == "sour" for s in suggestions)
             if has_sweet and not has_sour:
                 pool = self._get_family_filtered_items(profile, "sour")
                 fallback = _pick_first_matching(pool, ["lemon", "lime"])
@@ -1918,7 +2002,19 @@ class ProfileRecipeBuilder:
         # STEP 2: validate -> repair -> validate (template-aware)
         # -----------------------------
         all_fixes: List[str] = list(fixes)
-    
+
+        # Early deduplication to prevent same-object issues in repair
+        seen_names: set[str] = set()
+        deduped: List[IngredientSuggestion] = []
+        for sug in suggestions:
+            key = sug.ingredient.name.lower()
+            if key not in seen_names:
+                seen_names.add(key)
+                deduped.append(sug)
+        if len(deduped) != len(suggestions):
+            all_fixes.append("EARLY_DEDUPE")
+        suggestions[:] = deduped
+
         for _ in range(3):
             fails = self._critic(template, suggestions)
             if not fails:
@@ -1980,15 +2076,54 @@ class ProfileRecipeBuilder:
             )
 
             if not has_bitter:
-                # Try to swap mixer to tonic
+                bitter_added = False
+
+                # Strategy 1: Try to swap mixer to tonic (if mixer exists)
                 mixer_sug = next((s for s in suggestions if s.role == "mixer"), None)
                 if mixer_sug:
-                    # Use repository directly to avoid family filtering blocking tonic
                     pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
                     tonic = _pick_first_matching(pool, ["tonic"])
                     if tonic:
                         mixer_sug.ingredient = tonic
                         fixes.append("SWAPPED_MIXER_TO_TONIC_FOR_BITTERNESS")
+                        bitter_added = True
+
+                # Strategy 2: Add Aperol as modifier (preferred for high bitterness)
+                if not bitter_added:
+                    modifier_pool = self.repository.neutral_items(role="modifier") + self.repository.items_for_profile(profile, role="modifier")
+                    aperol = _pick_first_matching(modifier_pool, ["aperol", "campari", "amaro"])
+                    if aperol:
+                        suggestions.append(IngredientSuggestion(aperol, 15.0, "modifier"))
+                        fixes.append("ADDED_APEROL_FOR_BITTERNESS")
+                        bitter_added = True
+
+                # Strategy 3: Add grapefruit juice
+                if not bitter_added:
+                    juice_pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+                    grapefruit = _pick_first_matching(juice_pool, ["grapefruit"])
+                    if grapefruit:
+                        suggestions.append(IngredientSuggestion(grapefruit, 20.0, "juice"))
+                        fixes.append("ADDED_GRAPEFRUIT_FOR_BITTERNESS")
+                        bitter_added = True
+
+                # Strategy 4: Add bitters as last resort
+                if not bitter_added:
+                    bitters_pool = self.repository.neutral_items(role="modifier") + self.repository.items_for_profile(profile, role="modifier")
+                    bitters = _pick_first_matching(bitters_pool, ["bitter", "angostura"])
+                    if bitters:
+                        suggestions.append(IngredientSuggestion(bitters, 2.0, "modifier"))
+                        fixes.append("ADDED_BITTERS_FOR_BITTERNESS")
+                        bitter_added = True
+
+                # Strategy 5: Last resort - add small tonic splash even for still drinks
+                # High bitterness satisfaction takes priority over strict carbonation
+                if not bitter_added:
+                    mixer_pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+                    tonic = _pick_first_matching(mixer_pool, ["tonic"])
+                    if tonic:
+                        suggestions.append(IngredientSuggestion(tonic, 30.0, "mixer"))
+                        fixes.append("ADDED_TONIC_SPLASH_FOR_HIGH_BITTERNESS")
+                        bitter_added = True
 
         elif bitterness == "low":
             # Remove tonic if present (swap to soda/lemonade)
@@ -2000,10 +2135,65 @@ class ProfileRecipeBuilder:
                     mixer_sug.ingredient = replacement
                     fixes.append("SWAPPED_TONIC_FOR_LOW_BITTERNESS")
 
+        # -------------------------
+        # DUPLICATE DETECTION AND REMOVAL
+        # -------------------------
+        seen_ingredients: Dict[str, IngredientSuggestion] = {}
+        deduped_suggestions: List[IngredientSuggestion] = []
+
+        for sug in suggestions:
+            key = sug.ingredient.name.lower()
+            if key in seen_ingredients:
+                # Merge: keep the one with higher amount, combine amounts if same role
+                existing = seen_ingredients[key]
+                if existing.role == sug.role:
+                    # Same role: add amounts together
+                    existing.amount_ml += sug.amount_ml
+                else:
+                    # Different roles: keep the more important one (base > modifier > juice > etc.)
+                    role_priority = {"base": 0, "modifier": 1, "sour": 2, "juice": 3, "sweetener": 4, "mixer": 5}
+                    if role_priority.get(sug.role, 10) < role_priority.get(existing.role, 10):
+                        deduped_suggestions.remove(existing)
+                        seen_ingredients[key] = sug
+                        deduped_suggestions.append(sug)
+                fixes.append(f"MERGED_DUPLICATE: {key}")
+            else:
+                seen_ingredients[key] = sug
+                deduped_suggestions.append(sug)
+
+        suggestions[:] = deduped_suggestions
+
+        # -------------------------
+        # COMPONENT CAP: Keep 5-7 components (excluding garnish)
+        # -------------------------
+        component_count = sum(1 for s in suggestions if s.role != "garnish")
+        if component_count > 7:
+            # Priority for removal: second base > extra juice > extra modifier
+            # Keep: first base, sour, sweetener, first juice, mixer
+            removal_priority = []
+            bases = [s for s in suggestions if s.role == "base"]
+            juices = [s for s in suggestions if s.role == "juice"]
+            modifiers = [s for s in suggestions if s.role == "modifier"]
+
+            # Add items to removal priority (last = lowest priority to keep)
+            if len(bases) > 1:
+                removal_priority.extend(bases[1:])  # Keep first base
+            if len(juices) > 1:
+                removal_priority.extend(juices[1:])  # Keep first juice
+            if len(modifiers) > 1:
+                removal_priority.extend(modifiers[1:])  # Keep first modifier
+
+            # Remove items until we're at 7 or fewer
+            while component_count > 7 and removal_priority:
+                to_remove = removal_priority.pop(0)
+                if to_remove in suggestions:
+                    suggestions.remove(to_remove)
+                    fixes.append(f"REMOVED_EXCESS_COMPONENT: {to_remove.ingredient.name}")
+                    component_count -= 1
+
         garnish_items = self.repository.items_for_profile(profile, role="garnish")
         garnish = self._pick_garnish_guardrailed(responses, profile, garnish_items, suggestions)
-        if garnish == "" and garnish_items:
-            garnish = garnish_items[0].name
+        # _pick_garnish_guardrailed now always returns a non-empty string
     
         steps = self._build_steps_guardrailed(glass, responses, suggestions)
     
