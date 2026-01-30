@@ -1,4 +1,4 @@
- """Rule-based profile recipe builder."""
+"""Rule-based profile recipe builder."""
 
 from __future__ import annotations
 
@@ -82,6 +82,198 @@ TEMPLATE_RULES: Dict[str, Dict[str, Any]] = {
     "TIKI_SHAKEN": {"min_components": 6, "max_juices": 3, "requires_sour": True, "allows_mixer": False, "one_sour": True},
 }
 
+
+# =============================================================================
+# FLAVOR FAMILY GATING - Prevents wrong-vibe ingredients from being selected
+# =============================================================================
+
+FlavorFamily = Literal[
+    "DARK_SPICED_WOODY",
+    "FRESH_CITRUS_ZESTY",
+    "TROPICAL_BRIGHT",
+    "BERRY_FRUITY",
+    "FLORAL_ELEGANT",
+    "DESSERT_INDULGENT",
+    "CANDY_FUN",
+]
+
+# Banned ingredient patterns for each family (case-insensitive substring matching)
+FAMILY_BANS: Dict[str, Tuple[str, ...]] = {
+    "DARK_SPICED_WOODY": (
+        "malibu", "coconut syrup", "coconut rum", "passionfruit syrup", "passion fruit syrup",
+        "pineapple syrup", "bubblegum", "melon", "midori", "banana", "lychee",
+        "watermelon", "blue curacao", "marshmallow", "candy",
+    ),
+    "FRESH_CITRUS_ZESTY": (
+        "bubblegum", "marshmallow", "caramel syrup", "toffee", "vanilla syrup",
+        "coconut syrup", "banana", "melon", "midori", "candy",
+    ),
+    "TROPICAL_BRIGHT": (
+        # Permissive family - minimal bans
+        "maple syrup", "gingerbread",
+    ),
+    "BERRY_FRUITY": (
+        "coconut", "banana", "melon", "midori", "bubblegum", "caramel",
+    ),
+    "FLORAL_ELEGANT": (
+        "bubblegum", "banana", "coconut syrup", "melon", "midori",
+        "marshmallow", "caramel", "candy", "watermelon",
+    ),
+    "DESSERT_INDULGENT": (
+        # Permissive - just avoid raw tart clashes
+        "lime cordial",  # when used as primary sweetener
+    ),
+    "CANDY_FUN": (
+        # Permissive family for party vibes
+        "vermouth", "amaro",
+    ),
+}
+
+# Preferred ingredients for each family (used for scoring, not hard gating)
+FAMILY_PREFERENCES: Dict[str, Tuple[str, ...]] = {
+    "DARK_SPICED_WOODY": (
+        "spiced rum", "dark rum", "bourbon", "whiskey", "apple", "cranberry",
+        "maple", "honey", "gingerbread", "cinnamon", "vanilla", "rosemary", "orange peel",
+    ),
+    "FRESH_CITRUS_ZESTY": (
+        "lime", "lemon", "orange", "grapefruit", "citron", "cointreau", "triple sec",
+        "limoncello", "elderflower", "simple syrup", "agave",
+    ),
+    "TROPICAL_BRIGHT": (
+        "rum", "malibu", "coconut", "pineapple", "passionfruit", "passion fruit",
+        "orange", "grenadine", "blue curacao",
+    ),
+    "BERRY_FRUITY": (
+        "raspberry", "strawberry", "blackberry", "cranberry", "elderflower",
+        "pink gin", "berry",
+    ),
+    "FLORAL_ELEGANT": (
+        "elderflower", "st germain", "violet", "rose", "lavender", "gin",
+        "champagne", "prosecco", "honey",
+    ),
+    "DESSERT_INDULGENT": (
+        "vanilla", "caramel", "coffee", "chocolate", "amaretto", "frangelico",
+        "baileys", "cream", "marshmallow",
+    ),
+    "CANDY_FUN": (
+        "bubblegum", "watermelon", "cherry", "strawberry", "blue curacao",
+        "grenadine", "lemonade",
+    ),
+}
+
+
+def determine_flavor_family(responses: Dict[str, Any]) -> FlavorFamily:
+    """
+    Determine the primary flavor family based on questionnaire responses.
+    This gates which ingredients are even considered during recipe building.
+    """
+    season = (responses.get("season") or "").strip().lower()
+    house = (responses.get("house_type") or "").strip().lower()
+    aroma = (responses.get("aroma_preference") or "").strip().lower()
+    sweetener = (responses.get("sweetener_question") or "").strip().lower()
+    dining = (responses.get("dining_style") or "").strip().lower()
+    music = (responses.get("music_preference") or "").strip().lower()
+    bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
+
+    # Score each family based on signal matches
+    scores: Dict[str, float] = {
+        "DARK_SPICED_WOODY": 0.0,
+        "FRESH_CITRUS_ZESTY": 0.0,
+        "TROPICAL_BRIGHT": 0.0,
+        "BERRY_FRUITY": 0.0,
+        "FLORAL_ELEGANT": 0.0,
+        "DESSERT_INDULGENT": 0.0,
+        "CANDY_FUN": 0.0,
+    }
+
+    # DARK_SPICED_WOODY signals
+    if aroma in ("woody", "campfire"):
+        scores["DARK_SPICED_WOODY"] += 3.0
+    if season in ("autumn", "winter"):
+        scores["DARK_SPICED_WOODY"] += 1.5
+    if sweetener in ("classic", "rich"):
+        scores["DARK_SPICED_WOODY"] += 1.0
+    if "haunted" in house or "tree" in house:
+        scores["DARK_SPICED_WOODY"] += 1.0
+    if music in ("jazz/blues", "rock"):
+        scores["DARK_SPICED_WOODY"] += 0.5
+
+    # FRESH_CITRUS_ZESTY signals
+    if aroma == "citrus":
+        scores["FRESH_CITRUS_ZESTY"] += 3.0
+    if sweetener == "zesty":
+        scores["FRESH_CITRUS_ZESTY"] += 2.0
+    if "subtle" in dining or "fresh" in dining:
+        scores["FRESH_CITRUS_ZESTY"] += 1.5
+    if "modern" in house:
+        scores["FRESH_CITRUS_ZESTY"] += 0.5
+
+    # TROPICAL_BRIGHT signals
+    if season == "summer":
+        scores["TROPICAL_BRIGHT"] += 2.0
+    if "beach" in house:
+        scores["TROPICAL_BRIGHT"] += 3.0
+    if aroma == "sweet":
+        scores["TROPICAL_BRIGHT"] += 1.0
+    if "vibrant" in dining:
+        scores["TROPICAL_BRIGHT"] += 1.0
+
+    # BERRY_FRUITY signals
+    if season == "spring":
+        scores["BERRY_FRUITY"] += 2.0
+    if "balanced" in dining:
+        scores["BERRY_FRUITY"] += 1.0
+    if aroma == "floral":
+        scores["BERRY_FRUITY"] += 1.5
+
+    # FLORAL_ELEGANT signals
+    if aroma == "floral":
+        scores["FLORAL_ELEGANT"] += 3.5
+    if sweetener == "floral":
+        scores["FLORAL_ELEGANT"] += 2.0
+    if "subtle" in dining:
+        scores["FLORAL_ELEGANT"] += 1.0
+    if "modern" in house:
+        scores["FLORAL_ELEGANT"] += 0.5
+
+    # DESSERT_INDULGENT signals
+    if sweetener == "rich":
+        scores["DESSERT_INDULGENT"] += 2.5
+    if "sweet tooth" in dining or "dessert" in dining or "indulg" in dining:
+        scores["DESSERT_INDULGENT"] += 3.0
+    if aroma == "sweet":
+        scores["DESSERT_INDULGENT"] += 1.5
+    if season == "winter":
+        scores["DESSERT_INDULGENT"] += 1.0
+
+    # CANDY_FUN signals
+    if music in ("pop", "rap"):
+        scores["CANDY_FUN"] += 1.5
+    if "vibrant" in dining or "refreshing" in dining:
+        scores["CANDY_FUN"] += 1.0
+    if "beach" in house:
+        scores["CANDY_FUN"] += 0.5
+
+    # Find the winning family
+    best_family = max(scores.items(), key=lambda x: x[1])
+
+    # Default to FRESH_CITRUS_ZESTY if no strong signals
+    if best_family[1] < 2.0:
+        return "FRESH_CITRUS_ZESTY"
+
+    return best_family[0]  # type: ignore
+
+
+def get_family_banned_patterns(family: FlavorFamily) -> Tuple[str, ...]:
+    """Get the list of banned ingredient patterns for a flavor family."""
+    return FAMILY_BANS.get(family, ())
+
+
+def is_ingredient_banned_for_family(item_name: str, family: FlavorFamily) -> bool:
+    """Check if an ingredient is banned for the given flavor family."""
+    name_lower = item_name.lower()
+    banned_patterns = get_family_banned_patterns(family)
+    return any(pattern in name_lower for pattern in banned_patterns)
 
 
 @dataclass
@@ -379,6 +571,21 @@ class ProfileRecipeBuilder:
     def __init__(self, repository, glass_logic=None) -> None:
         self.repository = repository
         self.glass_logic = glass_logic
+        self._current_flavor_family: Optional[FlavorFamily] = None
+
+    def _get_family_filtered_items(self, profile: str, role: str) -> List[StockItem]:
+        """Get items for a profile/role, filtered by current flavor family bans."""
+        items = self.repository.neutral_items(role=role) + self.repository.items_for_profile(profile, role=role)
+        items = [item for item in items if not is_creamy(item)]
+
+        # Apply flavor family filtering (except for base spirits and garnishes)
+        if self._current_flavor_family and role not in ("base", "garnish"):
+            items = [
+                item for item in items
+                if not is_ingredient_banned_for_family(item.name, self._current_flavor_family)
+            ]
+
+        return items
 
     def build_recipe(self, responses: Dict[str, Any], profile: str, seed: int | None = None) -> CocktailRecipe:
         base_seed = seed if seed is not None else random.getrandbits(32)
@@ -481,10 +688,24 @@ class ProfileRecipeBuilder:
         template = select_template(responses)
         spec = TEMPLATE_SPECS[template]
 
+        # Determine flavor family for ingredient gating
+        flavor_family = determine_flavor_family(responses)
+        # Store for use in repair/fallback paths
+        self._current_flavor_family: FlavorFamily = flavor_family
+
         def profile_items(role: str) -> List[StockItem]:
             items = [item for item in self.repository.items_for_profile(profile, role=role) if not is_creamy(item)]
             if role != "garnish":
                 items.extend([i for i in self.repository.neutral_items(role=role) if not is_creamy(i)])
+
+            # FLAVOR FAMILY GATING: Filter out banned ingredients for this family
+            # Don't gate base spirits (user selected) or garnishes
+            if role not in ("base", "garnish"):
+                items = [
+                    item for item in items
+                    if not is_ingredient_banned_for_family(item.name, flavor_family)
+                ]
+
             rnd.shuffle(items)
             unique = []
             seen = set()
@@ -1316,7 +1537,7 @@ class ProfileRecipeBuilder:
         if "egg" in allergens or "no-foam" in allergens:
             return None
     
-        pool = self.repository.neutral_items(role="modifier") + self.repository.items_for_profile(profile, role="modifier")
+        pool = self._get_family_filtered_items(profile, "modifier")
         # try vegan first, then egg white
         agent = _pick_first_matching(pool, ["aquafaba", "vegan foamer", "foamer", "foam"])
         if agent:
@@ -1441,21 +1662,12 @@ class ProfileRecipeBuilder:
     
         # -------------------------
         # Step 3: Foam contract
+        # Foam = shaken build style, not necessarily a foaming agent ingredient
+        # Only add foam agent if available AND not already present
         # -------------------------
-        if foam_toggle == "yes":
-            # add foam agent if not already present
-            has_agent = any(
-                any(tok in s.ingredient.name.lower() for tok in ("aquafaba", "egg white", "eggwhite", "foamer", "foam"))
-                for s in suggestions
-            )
-            if not has_agent:
-                agent = self._select_foam_agent(responses, profile)
-                if agent:
-                    # typical: 15ml aquafaba or equivalent foamer, egg white handled similarly
-                    suggestions.append(IngredientSuggestion(agent, agent.default_measure_ml or 15.0, "modifier"))
-                    fixes.append("ADDED_FOAM_AGENT")
-                else:
-                    fixes.append("FOAM_UNAVAILABLE_FELL_BACK")
+        # Note: foam toggle affects method (shaken), not necessarily ingredients
+        # We skip adding foam agents since foam is achieved through shaking
+        # This prevents duplicate modifier additions in the repair loop
     
         # 1) Remove mixer if not allowed
         if not allows_mixer:
@@ -1471,7 +1683,7 @@ class ProfileRecipeBuilder:
         has_mixer = any(s.role == "mixer" for s in suggestions)
     
         if wants_fizzy and allows_mixer and not has_mixer:
-            pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+            pool = self._get_family_filtered_items(profile, "mixer")
             # properly fizzy: prefer soda/tonic/ginger; lightly: soda/lemonade
             if carbonation.startswith("proper"):
                 m = _pick_first_matching(pool, ["soda", "tonic", "ginger", "lemonade", "sparkling"])
@@ -1483,7 +1695,7 @@ class ProfileRecipeBuilder:
     
         # 2) Ensure sour exists if required
         if requires_sour and not any(s.role == "sour" for s in suggestions):
-            pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
+            pool = self._get_family_filtered_items(profile, "sour")
             sour = _pick_first_matching(pool, ["lemon", "lime"])
             if sour:
                 suggestions.append(IngredientSuggestion(sour, sour.default_measure_ml or 15.0, "sour"))
@@ -1517,7 +1729,7 @@ class ProfileRecipeBuilder:
             # if current sweetener is banned, remove it and replace
             if any(any(b in s.ingredient.name.lower() for b in ban) for s in sweeteners):
                 suggestions[:] = [s for s in suggestions if s.role != "sweetener"]
-                pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
+                pool = self._get_family_filtered_items(profile, "sweetener")
                 repl = _pick_first_matching(pool, prefer)
                 if repl:
                     suggestions.append(IngredientSuggestion(repl, repl.default_measure_ml or 12.0, "sweetener"))
@@ -1546,7 +1758,7 @@ class ProfileRecipeBuilder:
         if has_cran and has_gren:
             # swap grenadine to neutral sweetener
             suggestions[:] = [s for s in suggestions if not (s.role == "sweetener" and "grenadine" in s.ingredient.name.lower())]
-            pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
+            pool = self._get_family_filtered_items(profile, "sweetener")
             repl = _pick_first_matching(pool, ["simple", "maple", "honey", "syrup", "sugar"])
             if repl:
                 suggestions.append(IngredientSuggestion(repl, repl.default_measure_ml or 12.0, "sweetener"))
@@ -1568,7 +1780,40 @@ class ProfileRecipeBuilder:
             to_drop = juices_sorted[: len(juices) - max_juices]
             suggestions[:] = [s for s in suggestions if s not in to_drop]
             fixes.append("DROPPED_EXTRA_JUICE")
-    
+
+        # -------------------------
+        # Step 6: Bitterness enforcement
+        # -------------------------
+        bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
+
+        if bitterness == "high":
+            # Check if there's already a bitter element
+            bitter_patterns = ("tonic", "bitter", "amaro", "grapefruit", "aperol", "campari", "angostura")
+            has_bitter = any(
+                any(pat in s.ingredient.name.lower() for pat in bitter_patterns)
+                for s in suggestions
+            )
+
+            if not has_bitter:
+                # Try to swap mixer to tonic if allowed
+                mixer_sug = next((s for s in suggestions if s.role == "mixer"), None)
+                if mixer_sug:
+                    pool = self._get_family_filtered_items(profile, "mixer")
+                    tonic = _pick_first_matching(pool, ["tonic"])
+                    if tonic:
+                        mixer_sug.ingredient = tonic
+                        fixes.append("SWAPPED_MIXER_TO_TONIC_FOR_BITTERNESS")
+
+        elif bitterness == "low":
+            # Remove tonic if present (swap to soda/lemonade)
+            mixer_sug = next((s for s in suggestions if s.role == "mixer" and "tonic" in s.ingredient.name.lower()), None)
+            if mixer_sug:
+                pool = self._get_family_filtered_items(profile, "mixer")
+                replacement = _pick_first_matching(pool, ["soda", "lemonade"])
+                if replacement:
+                    mixer_sug.ingredient = replacement
+                    fixes.append("SWAPPED_TONIC_FOR_LOW_BITTERNESS")
+
         return fixes
 
     
@@ -1617,45 +1862,45 @@ class ProfileRecipeBuilder:
     
         # HARD RULE: carbonation must show (if fizzy, ensure a mixer exists) — AFTER stripping
         if (carbonation.startswith("light") or carbonation.startswith("proper")) and not any(s.role == "mixer" for s in suggestions):
-            pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+            pool = self._get_family_filtered_items(profile, "mixer")
             m = _pick_first_matching(pool, ["soda", "lemonade", "ginger", "tonic", "sparkling"])
             if m:
                 suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 75.0, "mixer"))
                 fixes.append("INJECTED_MIXER_FOR_CARBONATION")
-    
+
         # HARD FLOOR: still/sour drinks must be >= 5 components (avoid 3-ingredient drinks)
         if (carbonation.startswith("still") or template in {"SOUR", "SOUR_FOAMY"}) and self._count_components(suggestions) < 5:
-            pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+            pool = self._get_family_filtered_items(profile, "juice")
             j = _pick_first_matching(pool, ["apple", "cranberry", "orange"])
             if j:
                 suggestions.append(IngredientSuggestion(j, j.default_measure_ml or 30.0, "juice"))
                 fixes.append("ADDED_BODY_JUICE_FOR_COMPLETENESS")
-    
+
             if self._count_components(suggestions) < 5:
-                pool = self.repository.neutral_items(role="modifier") + self.repository.items_for_profile(profile, role="modifier")
+                pool = self._get_family_filtered_items(profile, "modifier")
                 m = _pick_first_matching(pool, ["bitters", "liqueur", "vermouth", "amaro", "ginger"])
                 if m:
                     suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 15.0, "modifier"))
                     fixes.append("ADDED_MODIFIER_FOR_COMPLETENESS")
-    
+
         # 3) Minimum viable cocktail (fast pass)
         if self._count_components(suggestions) < 5:
             fixes.append("UNDERBUILT_AUTOFILL")
-    
+
             has_juice = any(s.role == "juice" for s in suggestions)
             has_sour = any(s.role == "sour" for s in suggestions)
             has_sweet = any(s.role == "sweetener" for s in suggestions)
-    
+
             if not has_juice and not has_sour:
-                pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+                pool = self._get_family_filtered_items(profile, "juice")
                 fallback = _pick_first_matching(pool, ["orange", "apple", "cranberry", "pineapple"])
                 if fallback:
                     suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 30.0, "juice"))
                     fixes.append("ADDED_CORE_JUICE")
-    
+
             has_sour = any(s.role == "sour" for s in suggestions)
             if has_sweet and not has_sour:
-                pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
+                pool = self._get_family_filtered_items(profile, "sour")
                 fallback = _pick_first_matching(pool, ["lemon", "lime"])
                 if fallback:
                     suggestions.append(IngredientSuggestion(fallback, fallback.default_measure_ml or 15.0, "sour"))
@@ -1685,42 +1930,76 @@ class ProfileRecipeBuilder:
         # BULLETPROOF: NEVER ERROR — force safe structure if still failing
         if fails:
             all_fixes.append("FALLBACK_SAFE_STRUCTURE")
-    
+
             # If still or martini, ensure no mixer
             if carbonation.startswith("still") or is_martini:
                 suggestions, _ = self._remove_mixers(suggestions)
-    
+
             # Ensure at least one juice
             if not any(s.role == "juice" for s in suggestions):
-                pool = self.repository.neutral_items(role="juice") + self.repository.items_for_profile(profile, role="juice")
+                pool = self._get_family_filtered_items(profile, "juice")
                 j = _pick_first_matching(pool, ["apple", "cranberry", "orange"])
                 if j:
                     suggestions.append(IngredientSuggestion(j, j.default_measure_ml or 30.0, "juice"))
-    
+
             # Ensure sour
             if not any(s.role == "sour" for s in suggestions):
-                pool = self.repository.neutral_items(role="sour") + self.repository.items_for_profile(profile, role="sour")
+                pool = self._get_family_filtered_items(profile, "sour")
                 s_item = _pick_first_matching(pool, ["lemon", "lime"])
                 if s_item:
                     suggestions.append(IngredientSuggestion(s_item, s_item.default_measure_ml or 15.0, "sour"))
-    
+
             # Ensure sweetener
             if not any(s.role == "sweetener" for s in suggestions):
-                pool = self.repository.neutral_items(role="sweetener") + self.repository.items_for_profile(profile, role="sweetener")
+                pool = self._get_family_filtered_items(profile, "sweetener")
                 sw = _pick_first_matching(pool, ["simple", "syrup", "sugar", "maple"])
                 if sw:
                     suggestions.append(IngredientSuggestion(sw, sw.default_measure_ml or 12.0, "sweetener"))
-    
+
             # If fizzy requested, try inject mixer (but NEVER fail if none)
             if (carbonation.startswith("light") or carbonation.startswith("proper")) and not any(s.role == "mixer" for s in suggestions):
-                pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+                pool = self._get_family_filtered_items(profile, "mixer")
                 m = _pick_first_matching(pool, ["soda", "lemonade", "ginger", "tonic", "sparkling"])
                 if m:
                     suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 75.0, "mixer"))
                     all_fixes.append("INJECTED_MIXER_FOR_CARBONATION")
     
         fixes = all_fixes
-    
+
+        # -------------------------
+        # FINAL: Bitterness enforcement (after all repairs)
+        # -------------------------
+        bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
+
+        if bitterness == "high":
+            # Check if there's already a bitter element
+            bitter_patterns = ("tonic", "bitter", "amaro", "grapefruit", "aperol", "campari", "angostura")
+            has_bitter = any(
+                any(pat in s.ingredient.name.lower() for pat in bitter_patterns)
+                for s in suggestions
+            )
+
+            if not has_bitter:
+                # Try to swap mixer to tonic
+                mixer_sug = next((s for s in suggestions if s.role == "mixer"), None)
+                if mixer_sug:
+                    # Use repository directly to avoid family filtering blocking tonic
+                    pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+                    tonic = _pick_first_matching(pool, ["tonic"])
+                    if tonic:
+                        mixer_sug.ingredient = tonic
+                        fixes.append("SWAPPED_MIXER_TO_TONIC_FOR_BITTERNESS")
+
+        elif bitterness == "low":
+            # Remove tonic if present (swap to soda/lemonade)
+            mixer_sug = next((s for s in suggestions if s.role == "mixer" and "tonic" in s.ingredient.name.lower()), None)
+            if mixer_sug:
+                pool = self.repository.neutral_items(role="mixer") + self.repository.items_for_profile(profile, role="mixer")
+                replacement = _pick_first_matching(pool, ["soda", "lemonade"])
+                if replacement:
+                    mixer_sug.ingredient = replacement
+                    fixes.append("SWAPPED_TONIC_FOR_LOW_BITTERNESS")
+
         garnish_items = self.repository.items_for_profile(profile, role="garnish")
         garnish = self._pick_garnish_guardrailed(responses, profile, garnish_items, suggestions)
         if garnish == "" and garnish_items:
