@@ -1,4 +1,4 @@
-"""Rule-based profile recipe builder."""
+ """Rule-based profile recipe builder."""
 
 from __future__ import annotations
 
@@ -800,7 +800,7 @@ class ProfileRecipeBuilder:
         mapping = {
             "beach house": Glass("long glass", 400, sparkling=True),
             "modern house": Glass("martini glass", 250, sparkling=False),
-            "haunted house": Glass("skull glass", 400, sparkling=False),
+            "haunted house": Glass("mason jar", 400, sparkling=False),
             "tree house": Glass("gin glass", 500, sparkling=True),
         }
 
