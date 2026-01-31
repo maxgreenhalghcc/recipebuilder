@@ -1176,7 +1176,13 @@ class StockRepository:
         if normalized_name in {"lemon juice", "lime juice", "soda", "soda water", "club soda"}:
             neutral = True
 
-        # Role tweak for sour juices
+        # Force sour role for lemon/lime juice even if legacy data labelled it as a modifier.
+        if normalized_name in {"lemon juice", "lime juice"}:
+            category = "sour"
+            role = "sour"
+            default_measure = 20.0
+
+        # Role tweak for sour juices (defensive, for category==juice paths)
         if category == "juice" and normalized_name in {"lemon juice", "lime juice"}:
             category = "sour"
             role = "sour"
