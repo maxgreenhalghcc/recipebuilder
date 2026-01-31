@@ -129,3 +129,7 @@ This brief supports a model where we:
 3) Ask for lightweight feedback (1–2 questions) and update profile.
 
 Implementation roadmap: see `docs/recipe_generation/10-10-match-roadmap.md`.
+
+## Mapping to our current quiz (CCPLATFORM1)
+For a direct mapping from the current quiz question IDs (e.g. `bitterness_tolerance`, `sweetener_question`, `abv_lane`) to flavour-profile dimensions and recipe decisions, see:
+- `docs/research/quiz-question-mapping.md`
