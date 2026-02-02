@@ -1,74 +1,334 @@
 {
-  "question_field_weights": {
-    "dining_style": 0.9,
-    "aroma_preference": 0.8,
-    "base_spirit": 0.8,
-    "music_preference": 0.6,
-    "house_type": 0.6,
-    "season": 0.5,
-    "sweetener_question": 0.7,
-    "bitterness_tolerance": 0.7,
-    "carbonation_texture": 0.8,
-    "abv_lane": 0.7,
-    "allergens": 1.0,
-    "notes_keyword_bonus": 0.7
-  },
-  "answers_to_tags": {
-    "dining_style::a balanced blend of flavours": ["balanced", "elegant", "citrus", "herbal"],
-    "dining_style::subtle tastes which advertise freshness": ["fresh", "herbal", "subtle", "citrus", "floral"],
-    "dining_style::refreshing and vibrant flavours which awaken my senses": ["refreshing", "zesty", "citrus", "tropical", "bright"],
-    "dining_style::a sweet tooth indulging in rich flavours": ["indulgent", "sweet", "vanilla", "caramel", "spice", "chocolate"],
-    "aroma_preference::citrus": ["citrus", "bright", "zesty", "fresh"],
-    "aroma_preference::floral": ["floral", "elegant", "aromatic"],
-    "aroma_preference::woody": ["woody", "spice", "warm"],
-    "aroma_preference::sweet": ["sweet", "vanilla", "caramel", "dessert"],
-    "base_spirit::gin": ["herbal", "citrus", "floral"],
-    "base_spirit::vodka": ["clean", "refreshing"],
-    "base_spirit::rum": ["tropical", "sweet", "bold"],
-    "base_spirit::tequila": ["citrus", "zesty", "bold"],
-    "base_spirit::bourbon": ["woody", "caramel", "indulgent"],
-    "music_preference::jazz/blues": ["elegant", "herbal", "citrus", "smooth"],
-    "music_preference::pop": ["refreshing", "sweet", "tropical", "zesty", "bright"],
-    "music_preference::rock": ["bold", "woody", "smoke", "spice", "rich"],
-    "music_preference::rap": ["bold", "sweet", "spice", "citrus"],
-    "house_type::beach house": ["refreshing", "tropical", "citrus", "light", "sparkling"],
-    "house_type::modern house": ["elegant", "citrus", "herbal", "dry"],
-    "house_type::haunted house": ["bold", "spice", "woody", "indulgent"],
-    "house_type::tree house": ["herbal", "floral", "refreshing", "sparkling"],
-    "season::spring": ["floral", "fresh", "citrus"],
-    "season::summer": ["tropical", "citrus", "refreshing", "zesty"],
-    "season::autumn": ["woody", "spice", "caramel"],
-    "season::winter": ["vanilla", "caramel", "indulgent", "baking spice"],
-    "sweetener_question::classic": ["sweet", "balanced", "clean"],
-    "sweetener_question::rich": ["caramel", "vanilla", "indulgent", "rich"],
-    "sweetener_question::floral": ["floral", "elegant", "honey"],
-    "sweetener_question::zesty": ["citrus", "zesty", "bright"],
-    "bitterness_tolerance::low": ["low-bitter", "smooth"],
-    "bitterness_tolerance::medium": ["balanced-bitter"],
-    "bitterness_tolerance::high": ["bitter-friendly", "grown-up"],
-    "carbonation_texture::still & silky": ["still", "silky", "elegant"],
-    "carbonation_texture::lightly fizzy": ["light-fizz", "refreshing"],
-    "carbonation_texture::properly sparkling": ["sparkling", "crisp"],
-    "abv_lane::low": ["low-abv", "sessionable"],
-    "abv_lane::medium": ["mid-abv"],
-    "abv_lane::strong": ["high-abv", "spirit-forward"],
-    "allergens::coconut": ["avoid-coconut"],
-    "allergens::nuts": ["avoid-nut"],
-    "allergens::dairy": ["avoid-dairy"],
-    "allergens::egg": ["no-foam"],
-    "allergens::coffee": ["avoid-caffeine"],
-    "allergens::pineapple": ["avoid-pineapple"],
-    "allergens::grapefruit": ["avoid-grapefruit"],
-    "allergens::anise": ["avoid-anise"]
-  },
-  "notes_keywords": {
-    "not too sweet": ["reduce_sweet"],
-    "no coconut": ["avoid:coconut"],
-    "allergic to nuts": ["avoid:nut", "avoid:amaretto", "avoid:orgeat"],
-    "no dairy": ["avoid:dairy"],
-    "low alcohol": ["reduce_strength"],
-    "spicy": ["spice", "bold"],
-    "citrus forward": ["citrus"],
-    "prefer bitter": ["bitter", "bold"]
-  }
+    "question_field_weights": {
+        "dining_style": 0.9,
+        "aroma_preference": 0.8,
+        "base_spirit": 0.8,
+        "music_preference": 0.6,
+        "house_type": 0.6,
+        "season": 0.5,
+        "sweetener_question": 0.7,
+        "bitterness_tolerance": 0.7,
+        "carbonation_texture": 0.8,
+        "abv_lane": 0.7,
+        "allergens": 1.0,
+        "notes_keyword_bonus": 0.7
+    },
+    "answers_to_tags": {
+        "dining_style::a balanced blend of flavours": [
+            "balanced",
+            "elegant",
+            "citrus",
+            "herbal"
+        ],
+        "dining_style::subtle tastes which advertise freshness": [
+            "fresh",
+            "herbal",
+            "subtle",
+            "citrus",
+            "floral"
+        ],
+        "dining_style::refreshing and vibrant flavours which awaken my senses": [
+            "refreshing",
+            "zesty",
+            "citrus",
+            "tropical",
+            "bright"
+        ],
+        "dining_style::a sweet tooth indulging in rich flavours": [
+            "indulgent",
+            "sweet",
+            "vanilla",
+            "caramel",
+            "spice",
+            "chocolate"
+        ],
+        "aroma_preference::citrus": [
+            "citrus",
+            "bright",
+            "zesty",
+            "fresh"
+        ],
+        "aroma_preference::floral": [
+            "floral",
+            "elegant",
+            "aromatic"
+        ],
+        "aroma_preference::woody": [
+            "woody",
+            "spice",
+            "warm"
+        ],
+        "aroma_preference::sweet": [
+            "sweet",
+            "vanilla",
+            "caramel",
+            "dessert"
+        ],
+        "base_spirit::gin": [
+            "herbal",
+            "citrus",
+            "floral"
+        ],
+        "base_spirit::vodka": [
+            "clean",
+            "refreshing"
+        ],
+        "base_spirit::rum": [
+            "tropical",
+            "sweet",
+            "bold"
+        ],
+        "base_spirit::tequila": [
+            "citrus",
+            "zesty",
+            "bold"
+        ],
+        "base_spirit::bourbon": [
+            "woody",
+            "caramel",
+            "indulgent"
+        ],
+        "music_preference::jazz/blues": [
+            "elegant",
+            "herbal",
+            "citrus",
+            "smooth"
+        ],
+        "music_preference::pop": [
+            "refreshing",
+            "sweet",
+            "tropical",
+            "zesty",
+            "bright"
+        ],
+        "music_preference::rock": [
+            "bold",
+            "woody",
+            "smoke",
+            "spice",
+            "rich"
+        ],
+        "music_preference::rap": [
+            "bold",
+            "sweet",
+            "spice",
+            "citrus"
+        ],
+        "house_type::beach house": [
+            "refreshing",
+            "tropical",
+            "citrus",
+            "light",
+            "sparkling"
+        ],
+        "house_type::modern house": [
+            "elegant",
+            "citrus",
+            "herbal",
+            "dry"
+        ],
+        "house_type::haunted house": [
+            "bold",
+            "spice",
+            "woody",
+            "smoky",
+            "coffee",
+            "chocolate",
+            "indulgent"
+        ],
+        "house_type::tree house": [
+            "herbal",
+            "floral",
+            "refreshing",
+            "sparkling"
+        ],
+        "season::spring": [
+            "floral",
+            "fresh",
+            "citrus"
+        ],
+        "season::summer": [
+            "tropical",
+            "citrus",
+            "refreshing",
+            "zesty"
+        ],
+        "season::autumn": [
+            "woody",
+            "spice",
+            "caramel"
+        ],
+        "season::winter": [
+            "vanilla",
+            "caramel",
+            "indulgent",
+            "baking spice"
+        ],
+        "sweetener_question::classic": [
+            "sweet",
+            "balanced",
+            "clean"
+        ],
+        "sweetener_question::rich": [
+            "caramel",
+            "vanilla",
+            "indulgent",
+            "rich"
+        ],
+        "sweetener_question::floral": [
+            "floral",
+            "elegant",
+            "honey"
+        ],
+        "sweetener_question::zesty": [
+            "citrus",
+            "zesty",
+            "bright"
+        ],
+        "bitterness_tolerance::low": [
+            "low-bitter",
+            "smooth"
+        ],
+        "bitterness_tolerance::medium": [
+            "balanced-bitter"
+        ],
+        "bitterness_tolerance::high": [
+            "bitter-friendly",
+            "grown-up"
+        ],
+        "carbonation_texture::still & silky": [
+            "still",
+            "silky",
+            "elegant"
+        ],
+        "carbonation_texture::lightly fizzy": [
+            "light-fizz",
+            "refreshing"
+        ],
+        "carbonation_texture::properly sparkling": [
+            "sparkling",
+            "crisp"
+        ],
+        "abv_lane::low": [
+            "low-abv",
+            "sessionable"
+        ],
+        "abv_lane::medium": [
+            "mid-abv"
+        ],
+        "abv_lane::strong": [
+            "high-abv",
+            "spirit-forward"
+        ],
+        "allergens::coconut": [
+            "avoid-coconut"
+        ],
+        "allergens::nuts": [
+            "avoid-nut"
+        ],
+        "allergens::dairy": [
+            "avoid-dairy"
+        ],
+        "allergens::egg": [
+            "no-foam"
+        ],
+        "allergens::coffee": [
+            "avoid-caffeine"
+        ],
+        "allergens::pineapple": [
+            "avoid-pineapple"
+        ],
+        "allergens::grapefruit": [
+            "avoid-grapefruit"
+        ],
+        "allergens::anise": [
+            "avoid-anise"
+        ]
+    },
+    "notes_keywords": {
+        "not too sweet": [
+            "reduce_sweet"
+        ],
+        "no coconut": [
+            "avoid:coconut"
+        ],
+        "allergic to nuts": [
+            "avoid:nut",
+            "avoid:amaretto",
+            "avoid:orgeat"
+        ],
+        "no dairy": [
+            "avoid:dairy"
+        ],
+        "low alcohol": [
+            "reduce_strength"
+        ],
+        "spicy": [
+            "spice",
+            "bold"
+        ],
+        "citrus forward": [
+            "citrus"
+        ],
+        "prefer bitter": [
+            "bitter",
+            "bold"
+        ],
+        "smoky": [
+            "smoky",
+            "woody",
+            "bold"
+        ],
+        "smoke": [
+            "smoky",
+            "woody",
+            "bold"
+        ],
+        "coffee": [
+            "coffee",
+            "chocolate",
+            "woody"
+        ],
+        "espresso": [
+            "coffee",
+            "chocolate",
+            "bold"
+        ],
+        "dark": [
+            "woody",
+            "smoky",
+            "coffee",
+            "bold"
+        ],
+        "spooky": [
+            "woody",
+            "smoky",
+            "bold"
+        ],
+        "boozy": [
+            "high-abv",
+            "spirit-forward",
+            "bold"
+        ],
+        "spirit forward": [
+            "spirit-forward",
+            "bold"
+        ],
+        "chocolate": [
+            "chocolate",
+            "indulgent"
+        ],
+        "cocoa": [
+            "chocolate",
+            "indulgent"
+        ],
+        "not bitter": [
+            "low-bitter",
+            "smooth"
+        ],
+        "no bitter": [
+            "low-bitter",
+            "smooth"
+        ]
+    }
 }

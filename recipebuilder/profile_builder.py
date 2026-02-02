@@ -778,9 +778,12 @@ class ProfileRecipeBuilder:
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
 
-        base_ml = base_target - modifier_ml
+        # ABV lane sets total base spirit amount - don't subtract modifiers
+        base_ml = base_target
         if flavoured_spirit and flavoured_spirit.category == "spirit":
+            # If we have a flavoured spirit, split the target between base + flavoured
             base_ml = max(25.0, base_target - flavoured_ml)
+        # Clamp base to reasonable bounds
         if abv_lane == "low":
             base_ml = max(25.0, min(base_ml, 40.0))
         else:

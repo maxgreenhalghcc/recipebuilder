@@ -2069,11 +2069,14 @@ def _quantize_spirit_total(
     suggestions: Sequence[IngredientSuggestion], target_spirit_ml: float
 ) -> None:
     spirits = [s for s in suggestions if _normalize(s.ingredient.category) == "spirit"]
+    logger.info(f"_quantize_spirit_total: target={target_spirit_ml}ml, found {len(spirits)} spirits")
     if not spirits or target_spirit_ml <= 0:
         return
     current = sum(s.amount_ml for s in spirits if s.amount_ml > 0)
+    logger.info(f"_quantize_spirit_total: current total={current}ml, scaling to {target_spirit_ml}ml")
     if current <= 0:
         spirits[0].amount_ml = target_spirit_ml
+        logger.info(f"_quantize_spirit_total: set first spirit to {target_spirit_ml}ml")
         return
     scale = target_spirit_ml / current
     if scale <= 0:
@@ -2175,6 +2178,7 @@ def _select_garnish(
 def _ensure_palate_balance(
     suggestions: Sequence[IngredientSuggestion],
     plan,
+    target_spirit_ml: float = 35.0,
 ) -> None:
     if not suggestions:
         return
@@ -2215,11 +2219,15 @@ def _ensure_palate_balance(
 
     base_total = _total("base")
     if role_groups.get("base"):
-        base_target_min = 35.0
+        # Use the target_spirit_ml passed in from ABV lane choice
+        base_target_min = target_spirit_ml  # Use ABV lane target as minimum
         base_target_max = 60.0
+        logger.info(f"_ensure_palate_balance: base_total={base_total}ml, target_min={base_target_min}ml")
         primary_base = role_groups["base"][0]
         if base_total < base_target_min:
-            primary_base.amount_ml += base_target_min - base_total
+            deficit = base_target_min - base_total
+            primary_base.amount_ml += deficit
+            logger.info(f"_ensure_palate_balance: increased {primary_base.ingredient.name} by {deficit}ml to {primary_base.amount_ml}ml")
             base_total = _total("base")
         elif base_total > base_target_max:
             scale = base_target_max / base_total if base_total > 0 else 1.0
@@ -2470,6 +2478,7 @@ def generate_cocktail_recipe(
     elif abv_lane_choice == "low":
         target_spirit_ml = 25.0
     plan.strength_oz = target_spirit_ml / 29.5735
+    logger.info(f"ABV lane '{abv_lane_choice}' → target_spirit_ml = {target_spirit_ml}ml")
     lengthener_rules = dict(getattr(plan, "lengthener_rules", {}) or {})
     if carbonation_choice == "still & silky":
         lengthener_rules["allow_carbonated"] = False
@@ -2743,7 +2752,7 @@ def generate_cocktail_recipe(
             plan=plan,
         )
 
-    _ensure_palate_balance(suggestions, plan)
+    _ensure_palate_balance(suggestions, plan, target_spirit_ml)
 
     existing_tags = _collect_tags(suggestions)
 
@@ -2829,7 +2838,7 @@ def generate_cocktail_recipe(
                     used_juice_names.add(normalized_name)
                 suggestions.append(IngredientSuggestion(candidate, addition_amount, "juice"))
                 juice_hints.append(candidate.name)
-            _ensure_palate_balance(suggestions, plan)
+            _ensure_palate_balance(suggestions, plan, target_spirit_ml)
             existing_tags = _collect_tags(suggestions)
             total_ml = sum(s.amount_ml for s in suggestions if s.amount_ml > 0)
             top_up_needed = max(plan.glass_min_ml - total_ml, 0.0)
