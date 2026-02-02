@@ -1,8 +1,51 @@
 # Recipe Engine Fixes - Handoff to Jonny
 
 **Date:** 2 Feb 2026  
-**Baseline Score:** 8.2/10 on weekend recipes (target: 9+/10)  
+**Updated:** 2 Feb 2026 08:58 GMT  
+**Baseline Score:** 8.2/10 on weekend recipes  
+**Current Score:** 9.1/10 (+0.9 improvement)  
 **Test Suite:** `test_weekend_recipes.py` (7 real weekend orders with human-style inputs)
+
+---
+
+## What's Been Fixed (2 hours of work)
+
+✅ **Foam Contract (P0)** - COMPLETE  
+- Fixed: foam=yes + fizzy now shakes ingredients first, then tops
+- Impact: 1 failure → 0 failures
+- Commit: df1925c
+
+✅ **Woody Aroma Discipline (P1)** - PARTIAL  
+- Fixed: Ban candy fruits (banana, coconut, peach) from woody contexts
+- Fixed: Prioritize woody ingredients (amaretto, cognac, cinnamon)
+- Impact: 3 failures → 1 failure (profile system conflict on 1 recipe)
+- Commit: df1925c
+
+✅ **Citrus Aroma Discipline (P1)** - COMPLETE  
+- Fixed: Ban candy fruits from citrus contexts
+- Impact: Working correctly
+
+---
+
+## Remaining Work for Jonny (2-3 hours)
+
+❌ **ABV Strong Lane (P0)** - NOT FIXED  
+- Issue: Gets 35ml base instead of 50-60ml
+- Attempts made: Fixed base_ml calculation but other code paths override it
+- Root cause: Multiple code paths adjust base amount (line 781, 790, etc.)
+- **Estimated time:** 1-2 hours
+
+❌ **Ingredient Redundancy (P2)** - NOT FIXED  
+- Issue: Double elderflower (liqueur + cordial)
+- **Estimated time:** 30 minutes
+
+❌ **Woody + Profile Conflict (P1)** - BLOCKED  
+- Issue: When profile='citrus_fresh' + aroma='woody', profile wins
+- Amaretto exists in stock but profile system rejects it
+- **Solution:** Either (a) make aroma override profile, or (b) add woody items to more profiles
+- **Estimated time:** 1 hour
+
+**Total remaining:** 2.5-3.5 hours to reach 9.5+/10
 
 ---
 
