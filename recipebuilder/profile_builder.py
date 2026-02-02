@@ -740,24 +740,16 @@ class ProfileRecipeBuilder:
 
         juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=spec["max_juices"])
 
-        sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
-            profile,
-            base_family,
-            profile_items("sweetener"),
-            profile_items("base"),
-            abv_lane,
-            rnd,
-            aroma_preference=responses.get("aroma_preference") or "",
-        )
-
-        # Modifier keyword adjustments (floral prefer elderflower etc.)
+        # Modifier keyword adjustments + aroma-based filtering
         modifier_keywords = list(prefs.get("modifier_keywords") or [])
         sweetener_keywords = list(prefs.get("sweetener_keywords") or [])
 
+        # Start with profile-specific pools
+        modifiers_pool = profile_items("modifier")
+        sweeteners_pool = profile_items("sweetener")
+        
         if aroma == "floral":
             floral_terms = ("elderflower", "st germain", "st-germain", "stgermain")
-            modifiers_pool = profile_items("modifier")
-            sweeteners_pool = profile_items("sweetener")
 
             if _has_any_term(modifiers_pool, floral_terms):
                 modifier_keywords = ["elderflower", "st germain"] + [
@@ -769,8 +761,56 @@ class ProfileRecipeBuilder:
                     k for k in sweetener_keywords
                     if "elder" not in k.lower() and "germain" not in k.lower()
                 ]
+        
+        # Woody aroma enforcement - ban candy fruits + prioritize woody items
+        elif aroma == "woody":
+            woody_terms = ("amaretto", "disaronno", "cognac", "cinnamon", "walnut", "hazelnut", "frangelico")
+            candy_terms = ("banana", "coconut", "peach", "passion", "pineapple", "mango", "bubblegum")
+            
+            # Filter out candy ingredients
+            modifiers_pool = [m for m in modifiers_pool if not any(candy in m.name.lower() for candy in candy_terms)]
+            sweeteners_pool = [s for s in sweeteners_pool if not any(candy in s.name.lower() for candy in candy_terms)]
+            
+            # Filter to ONLY woody items (strict enforcement)
+            def has_woody(item: StockItem) -> bool:
+                return any(w in item.name.lower() for w in woody_terms)
+            
+            woody_modifiers = [m for m in modifiers_pool if has_woody(m)]
+            woody_sweeteners = [s for s in sweeteners_pool if has_woody(s)]
+            
+            # Use woody-only pools if available, else fall back to filtered pools
+            if woody_modifiers:
+                modifiers_pool = woody_modifiers
+                modifier_keywords = ["amaretto", "disaronno", "cognac", "cinnamon", "walnut", "hazelnut", "frangelico"] + modifier_keywords
+            
+            if woody_sweeteners:
+                sweeteners_pool = woody_sweeteners
+                sweetener_keywords = ["cinnamon", "amaretto", "maple"] + sweetener_keywords
+        
+        # Citrus aroma enforcement - ban candy fruits
+        elif aroma == "citrus":
+            citrus_terms = ("lime", "lemon", "orange", "grapefruit", "yuzu", "bergamot")
+            candy_terms = ("banana", "peach", "coconut", "passion")
+            
+            # Filter out candy
+            modifiers_pool = [m for m in modifiers_pool if not any(candy in m.name.lower() for candy in candy_terms)]
+            
+            # Prefer citrus modifiers
+            if _has_any_term(modifiers_pool, citrus_terms):
+                modifier_keywords = ["cointreau", "orange", "limoncello"] + modifier_keywords
 
-        modifier = self._choose_modifier(profile_items("modifier"), modifier_keywords)
+        # NOW select sweetener using filtered pool
+        sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
+            profile,
+            base_family,
+            sweeteners_pool,  # Use filtered pool based on aroma
+            profile_items("base"),
+            abv_lane,
+            rnd,
+            aroma_preference=responses.get("aroma_preference") or "",
+        )
+
+        modifier = self._choose_modifier(modifiers_pool, modifier_keywords)
 
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
         sour = self._maybe_add_sour(profile, available_sours, bool(spec["needs_sour"]))
@@ -1663,15 +1703,28 @@ class ProfileRecipeBuilder:
                 "Garnish and serve.",
             ]
     
-        # Fizzy builds: build + top
-        steps = [
-            f"Fill a {glass.name} with cubed ice.",
-            "Add spirits, syrups, juices and sour. Give a brief stir.",
-        ]
-        if mixer:
-            steps.append(f"Top with {mixer.ingredient.name}.")
-        steps.append("Garnish and serve.")
-        return steps
+        # Fizzy builds: shake if foam requested, else build
+        if foam_toggle == "yes":
+            # Foam requires shaking (aeration creates foam), then top
+            steps = [
+                f"Fill a {glass.name} with cubed ice.",
+                "Add all non-mixer ingredients to a shaker with ice and shake hard.",
+                f"Strain into the ice-filled {glass.name}.",
+            ]
+            if mixer:
+                steps.append(f"Top with {mixer.ingredient.name}.")
+            steps.append("Garnish and serve.")
+            return steps
+        else:
+            # Regular build method for fizzy drinks
+            steps = [
+                f"Fill a {glass.name} with cubed ice.",
+                "Add spirits, syrups, juices and sour. Give a brief stir.",
+            ]
+            if mixer:
+                steps.append(f"Top with {mixer.ingredient.name}.")
+            steps.append("Garnish and serve.")
+            return steps
 
         
     def _critic(self, template: str, suggestions: List[IngredientSuggestion]) -> List[str]:

@@ -144,13 +144,18 @@ def score_recipe(payload, recipe):
     ingredients = [f"{ing.amount_ml}ml {ing.ingredient.name}" for ing in recipe.ingredients]
     method = ' '.join(recipe.steps)
     
-    # 1. Check foam contract (if foam=yes + fizzy → must shake first)
+    # 1. Check foam contract (if foam=yes + fizzy → must shake ingredients, not just stir)
     if payload.get('foam_toggle') == 'yes':
         carbonation = payload.get('carbonation_texture', '')
         if 'fizzy' in carbonation or 'sparkling' in carbonation:
-            if 'shake' not in method.lower() or 'fill' in method.lower().split('shake')[0]:
+            # Check that we shake ingredients (not just stir them)
+            if 'shake' not in method.lower():
                 score -= 2.0
-                issues.append("FOAM_CONTRACT_BROKEN: foam=yes + fizzy but using build method")
+                issues.append("FOAM_CONTRACT_BROKEN: foam=yes + fizzy but no shake step")
+            elif 'stir' in method.lower() and 'shake' not in method.lower().split('stir')[0]:
+                # If we stir before shaking, that's build method (wrong)
+                score -= 2.0
+                issues.append("FOAM_CONTRACT_BROKEN: foam=yes + fizzy but using stir instead of shake")
     
     # 2. Check ABV lane (strong → 50-60ml total base spirits)
     if payload.get('abv_lane') == 'strong':
