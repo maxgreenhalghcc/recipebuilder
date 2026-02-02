@@ -762,10 +762,37 @@ class ProfileRecipeBuilder:
                     if "elder" not in k.lower() and "germain" not in k.lower()
                 ]
         
-        # Woody aroma enforcement - ban candy fruits + prioritize woody items
+        # Woody aroma enforcement - EXPAND pool to all stock + ban candy fruits + prioritize woody items
         elif aroma == "woody":
             woody_terms = ("amaretto", "disaronno", "cognac", "cinnamon", "walnut", "hazelnut", "frangelico")
             candy_terms = ("banana", "coconut", "peach", "passion", "pineapple", "mango", "bubblegum")
+            
+            # EXPAND pool: aroma overrides profile (get ALL modifiers/sweeteners from stock)
+            all_modifiers = [item for item in self.repository.items_for_profile(profile, role="modifier")]
+            all_modifiers.extend([i for i in self.repository.neutral_items(role="modifier")])
+            # Add ALL available modifiers from ALL profiles
+            for p in ["tropical", "citrus_fresh", "berry", "classic_boozy", "candy_fun", "dessert"]:
+                all_modifiers.extend([i for i in self.repository.items_for_profile(p, role="modifier")])
+            # Deduplicate
+            seen = set()
+            expanded_modifiers = []
+            for m in all_modifiers:
+                if m.name not in seen:
+                    seen.add(m.name)
+                    expanded_modifiers.append(m)
+            modifiers_pool = expanded_modifiers
+            
+            all_sweeteners = [item for item in self.repository.items_for_profile(profile, role="sweetener")]
+            all_sweeteners.extend([i for i in self.repository.neutral_items(role="sweetener")])
+            for p in ["tropical", "citrus_fresh", "berry", "classic_boozy", "candy_fun", "dessert"]:
+                all_sweeteners.extend([i for i in self.repository.items_for_profile(p, role="sweetener")])
+            seen_sw = set()
+            expanded_sweeteners = []
+            for s in all_sweeteners:
+                if s.name not in seen_sw:
+                    seen_sw.add(s.name)
+                    expanded_sweeteners.append(s)
+            sweeteners_pool = expanded_sweeteners
             
             # Filter out candy ingredients
             modifiers_pool = [m for m in modifiers_pool if not any(candy in m.name.lower() for candy in candy_terms)]
@@ -818,24 +845,16 @@ class ProfileRecipeBuilder:
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
 
-        # ABV lane sets total base spirit amount - don't subtract modifiers
+        # ABV lane sets total base spirit amount - use full target
+        # Don't subtract modifiers or flavoured spirits
         base_ml = base_target
-        if flavoured_spirit and flavoured_spirit.category == "spirit":
-            # If we have a flavoured spirit, split the target between base + flavoured
-            base_ml = max(25.0, base_target - flavoured_ml)
         # Clamp base to reasonable bounds
         if abv_lane == "low":
             base_ml = max(25.0, min(base_ml, 40.0))
-        else:
-            base_ml = max(40.0, min(base_ml, 60.0))
-
-        if flavoured_spirit and flavoured_spirit.category == "spirit":
-            total_spirits = base_ml + flavoured_ml
-            if total_spirits > 60.0:
-                excess = total_spirits - 60.0
-                base_ml = max(25.0, base_ml - excess)
-            if total_spirits < 40.0:
-                base_ml = max(25.0, 40.0 - flavoured_ml)
+        elif abv_lane == "medium":
+            base_ml = max(40.0, min(base_ml, 50.0))
+        else:  # strong
+            base_ml = max(50.0, min(base_ml, 60.0))
 
         juice_amounts = self._assign_juice_amounts(juices, carbonation, prefs["juice_ml"])
 
@@ -957,16 +976,22 @@ class ProfileRecipeBuilder:
         used_fallback = False
         relaxed_profile = profile
 
+        # Pass aroma to validation so it can override profile conflicts
+        aroma = responses.get("aroma_preference")
+        
         try:
-            self._validate(profile, suggestions)
+            self._validate(profile, suggestions, aroma=aroma)
         except ValueError:
             if self._should_relax_base(responses, profile, suggestions):
                 relaxed_profile, suggestions, used_fallback = self._apply_base_relaxation(
                     responses, profile, suggestions
                 )
-                self._validate(relaxed_profile, suggestions, allow_relaxed=True)
+                self._validate(relaxed_profile, suggestions, allow_relaxed=True, aroma=aroma)
             else:
                 raise
+
+        # --- REDUNDANCY CHECK: Remove duplicate ingredient families ---
+        suggestions = self._remove_redundant_ingredients(suggestions)
 
         # --- GUARDRAILS PASS (fix / validate / reject) ---
         glass, suggestions, garnish, steps, fixes = self._apply_guardrails(
@@ -1532,6 +1557,45 @@ class ProfileRecipeBuilder:
         before = len(suggestions)
         suggestions = [s for s in suggestions if s.role != "mixer"]
         return suggestions, (len(suggestions) != before)
+
+    def _remove_redundant_ingredients(self, suggestions: List[IngredientSuggestion]) -> List[IngredientSuggestion]:
+        """Remove redundant ingredients from the same flavor family (e.g., double elderflower)."""
+        REDUNDANCY_FAMILIES = {
+            'elderflower': ['elderflower liqueur', 'elderflower cordial', 'elderflower'],
+            'peach': ['peach schnapps', 'peach syrup', 'peach liqueur', 'peach'],
+            'lime': ['lime juice', 'lime cordial', 'lime'],
+            'lemon': ['lemon juice', 'lemon cordial', 'lemon'],
+            'orange': ['orange liqueur', 'orange juice', 'orange cordial', 'cointreau', 'triple sec', 'curaçao'],
+        }
+        
+        # Track which families we've seen
+        seen_families: Dict[str, IngredientSuggestion] = {}
+        filtered: List[IngredientSuggestion] = []
+        
+        for sugg in suggestions:
+            name_lower = sugg.ingredient.name.lower()
+            
+            # Check if this ingredient belongs to any redundancy family
+            found_family = None
+            for family, keywords in REDUNDANCY_FAMILIES.items():
+                if any(kw in name_lower for kw in keywords):
+                    found_family = family
+                    break
+            
+            if found_family:
+                if found_family in seen_families:
+                    # Already have something from this family
+                    # Keep the first one (usually the modifier/liqueur is stronger/better)
+                    continue
+                else:
+                    # First time seeing this family
+                    seen_families[found_family] = sugg
+                    filtered.append(sugg)
+            else:
+                # Not in any redundancy family, keep it
+                filtered.append(sugg)
+        
+        return filtered
 
     def _ensure_ice_program(self, glass: Glass, responses: Dict[str, Any]) -> str:
         if self._is_martini_style_glass(glass.name):
@@ -2263,6 +2327,7 @@ class ProfileRecipeBuilder:
         suggestions: Sequence[IngredientSuggestion],
         *,
         allow_relaxed: bool = False,
+        aroma: Optional[str] = None,
     ) -> None:
         juices = [s for s in suggestions if s.role == "juice"]
         sweeteners = [s for s in suggestions if s.role == "sweetener" and not s.ingredient.neutral]
@@ -2274,7 +2339,13 @@ class ProfileRecipeBuilder:
             item = suggestion.ingredient
             if suggestion.role in {"garnish", "mixer"}:
                 continue
-            if allow_relaxed:
+            
+            # When aroma is explicitly set (woody/citrus), allow profile overrides
+            # Aroma preferences are stronger than profile compatibility
+            if aroma in ("woody", "citrus"):
+                # Skip profile compatibility checks - aroma overrides profile
+                pass
+            elif allow_relaxed:
                 if profile in item.avoid_profiles:
                     raise ValueError(f"Ingredient {item.name} avoids profile {profile}")
             else:

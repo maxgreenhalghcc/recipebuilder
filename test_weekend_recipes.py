@@ -168,7 +168,7 @@ def score_recipe(payload, recipe):
     
     # 3. Check woody aroma (should have woody ingredients, not candy)
     if payload.get('aroma_preference') == 'woody':
-        woody_words = ['amaretto', 'cognac', 'spiced', 'cinnamon', 'walnut', 'oak']
+        woody_words = ['amaretto', 'cognac', 'spiced', 'cinnamon', 'walnut', 'oak', 'hazelnut', 'frangelico', 'maple']
         candy_words = ['peach', 'banana', 'bubblegum', 'coconut', 'passion fruit']
         
         ing_text = ' '.join(ingredients).lower()
