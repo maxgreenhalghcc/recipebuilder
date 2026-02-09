@@ -20,6 +20,7 @@ from recipebuilder import (
     generate_cocktail_recipe,
 )
 from recipebuilder.recipe_engine import UnknownBarError
+from recipebuilder.bartender_score import iterate_until_pass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -644,11 +645,28 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
     # Collapse duplicate alcohol lines (e.g., 25ml Orange Gin + 25ml Orange Gin -> 50ml Orange Gin).
     ingredients_list = _merge_duplicate_alcohol_lines(ingredients_list)
 
+    # --- Bartender scoring loop: iterate until quality + bespoke >= 8 each ---
+    try:
+        stock_names = [item.name for item in _REPOSITORY._all_items]
+    except Exception:
+        stock_names = None
+
+    ingredients_list, method_text, coerced_glassware, garnish_text = iterate_until_pass(
+        ingredients_list,
+        method_text,
+        coerced_glassware,
+        recipe.garnish or "",
+        responses_with_bar,
+        stock_names=stock_names,
+        max_iterations=4,
+        target_score=8.0,
+    )[:4]
+
     signature_recipe = {
         "body": {
             "ingredients": ingredients_list,
             "glassware": coerced_glassware,
-            "garnish": recipe.garnish or "",
+            "garnish": garnish_text,
         }
     }
 
@@ -675,7 +693,7 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
                 "ingredients": ingredients_list,
                 "method": method_text,
                 "glassware": coerced_glassware,
-                "garnish": recipe.garnish or "",
+                "garnish": garnish_text,
                 "warnings": warnings,
             },
             "abvEstimate": None,
