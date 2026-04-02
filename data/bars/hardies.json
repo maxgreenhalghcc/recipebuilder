@@ -461,18 +461,6 @@
       "neutral": false
     },
     {
-      "name": "Worcestershire Sauce",
-      "category": "modifier",
-      "flavour_tags": ["savory", "rich"],
-      "profiles": ["classic_boozy"],
-      "aromas": ["spiced"],
-      "seasons": ["all"],
-      "default_measure_ml": 5.0,
-      "role": "modifier",
-      "avoid_profiles": ["berry", "candy_fun", "dessert", "tropical"],
-      "neutral": false
-    },
-    {
       "name": "Prosecco",
       "category": "mixer",
       "flavour_tags": ["fresh", "vibrant"],
