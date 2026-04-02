@@ -279,17 +279,6 @@
       "neutral": false
     },
     {
-      "name": "Aquafaba",
-      "category": "modifier",
-      "flavour_tags": ["soft", "neutral"],
-      "profiles": ["berry", "citrus_fresh", "classic_boozy", "dessert", "tropical"],
-      "aromas": ["fresh"],
-      "seasons": ["all"],
-      "default_measure_ml": 15.0,
-      "role": "modifier",
-      "neutral": true
-    },
-    {
       "name": "Passion Fruit Juice",
       "category": "juice",
       "flavour_tags": ["exotic", "indulgent"],
