@@ -27,6 +27,17 @@
       "spirit_subtype": "light"
     },
     {
+      "name": "Premium Vodka",
+      "category": "spirit",
+      "flavour_tags": ["clean", "neutral"],
+      "profiles": ["berry", "candy_fun", "citrus_fresh", "classic_boozy", "tropical"],
+      "aromas": ["clean"],
+      "seasons": ["all"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "neutral": true
+    },
+    {
       "name": "Slingsby Gin",
       "category": "spirit",
       "flavour_tags": ["botanical", "fresh"],
