@@ -14,6 +14,19 @@
       "neutral": false
     },
     {
+      "name": "Tequila Blanco",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["classic_boozy", "tropical"],
+      "aromas": ["citrus"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["candy_fun", "dessert"],
+      "neutral": false,
+      "spirit_subtype": "light"
+    },
+    {
       "name": "Slingsby Gin",
       "category": "spirit",
       "flavour_tags": ["botanical", "fresh"],
