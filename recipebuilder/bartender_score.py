@@ -641,9 +641,19 @@ def improve_recipe(
         action = reason.fix_action
 
         if action == "inject_sour":
-            # Add lemon juice if not present
+            # Add sour only if not already present and a sour exists in stock
             if not _has_role(ingredients, "sour"):
-                ingredients.append("15ml Lemon Juice (sour)")
+                sour_name = "Lemon Juice"
+                if stock_names:
+                    stock_lower = [s.lower() for s in stock_names]
+                    for candidate in ("fresh lemon juice", "lemon juice", "fresh lime juice", "lime juice", "citrus juice"):
+                        if any(candidate in s for s in stock_lower):
+                            sour_name = next(s for s in stock_names if candidate in s.lower())
+                            break
+                    else:
+                        # No sour in stock — skip injection
+                        continue
+                ingredients.append(f"15ml {sour_name} (sour)")
                 if "shake" in method.lower() or "stir" in method.lower():
                     pass  # method already has a build step
                 else:

@@ -483,6 +483,111 @@
       "default_measure_ml": 100.0,
       "role": "mixer",
       "neutral": false
+    },
+    {
+      "name": "Fresh Lemon Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["citrus_fresh", "berry", "tropical", "classic_boozy", "candy_fun"],
+      "aromas": ["citrus"],
+      "seasons": ["all"],
+      "default_measure_ml": 15.0,
+      "role": "sour",
+      "neutral": false
+    },
+    {
+      "name": "Fresh Lime Juice",
+      "category": "juice",
+      "flavour_tags": ["zesty", "fresh"],
+      "profiles": ["citrus_fresh", "berry", "tropical", "classic_boozy", "candy_fun"],
+      "aromas": ["citrus"],
+      "seasons": ["all"],
+      "default_measure_ml": 15.0,
+      "role": "sour",
+      "neutral": false
+    },
+    {
+      "name": "Blue Raspberry Vodka",
+      "category": "spirit",
+      "flavour_tags": ["candy", "fruity", "vibrant"],
+      "profiles": ["candy_fun", "berry"],
+      "aromas": ["sweet", "berry"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["classic_boozy", "dessert"],
+      "neutral": false
+    },
+    {
+      "name": "Strawberry Vodka",
+      "category": "spirit",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["berry", "candy_fun", "citrus_fresh"],
+      "aromas": ["sweet", "berry"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["classic_boozy", "dessert"],
+      "neutral": false
+    },
+    {
+      "name": "Pink Lemonade Vodka",
+      "category": "spirit",
+      "flavour_tags": ["zesty", "vibrant", "fruity"],
+      "profiles": ["citrus_fresh", "berry", "candy_fun"],
+      "aromas": ["citrus", "sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["classic_boozy", "dessert"],
+      "neutral": false
+    },
+    {
+      "name": "Juicy Peach Vodka",
+      "category": "spirit",
+      "flavour_tags": ["fruity", "vibrant"],
+      "profiles": ["tropical", "candy_fun", "citrus_fresh"],
+      "aromas": ["sweet"],
+      "seasons": ["spring", "summer"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["classic_boozy", "dessert"],
+      "neutral": false
+    },
+    {
+      "name": "Pineapple Vodka",
+      "category": "spirit",
+      "flavour_tags": ["tropical", "vibrant"],
+      "profiles": ["tropical", "candy_fun"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 50.0,
+      "role": "base",
+      "avoid_profiles": ["classic_boozy", "dessert", "berry", "citrus_fresh"],
+      "neutral": false
+    },
+    {
+      "name": "Apple Juice",
+      "category": "juice",
+      "flavour_tags": ["fresh", "crisp"],
+      "profiles": ["classic_boozy", "citrus_fresh", "berry", "tropical"],
+      "aromas": ["fresh"],
+      "seasons": ["autumn", "spring", "summer"],
+      "default_measure_ml": 25.0,
+      "role": "juice",
+      "neutral": false
+    },
+    {
+      "name": "Pineapple Juice",
+      "category": "juice",
+      "flavour_tags": ["tropical", "vibrant"],
+      "profiles": ["candy_fun", "tropical", "dessert"],
+      "aromas": ["sweet"],
+      "seasons": ["summer"],
+      "default_measure_ml": 25.0,
+      "role": "juice",
+      "avoid_profiles": ["classic_boozy"],
+      "neutral": false
     }
   ]
 }

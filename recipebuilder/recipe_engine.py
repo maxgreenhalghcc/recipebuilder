@@ -1216,7 +1216,7 @@ class StockRepository:
         )
 
     def items_for_profile(self, profile: str, *, role: str | None = None) -> List[StockItem]:
-        items = [item for item in self._cached_items.get(profile, []) if (profile in item.profiles or item.neutral) and profile not in item.avoid_profiles]
+        items = [item for item in self._cached_items.get(profile, []) if (profile in item.profiles or item.neutral) and profile not in item.avoid_profiles and (not item.dessert_only or profile == "dessert")]
         if role:
             items = [item for item in items if item.role == role]
         return items
@@ -1240,6 +1240,9 @@ class StockRepository:
         for item in self._all_items:
             if item.category != "spirit":
                 continue
+            if item.role == "base":
+                # base-role spirits are chosen via _choose_base; don't add a second base
+                continue
             if _is_creamy_name(item.name):
                 continue
             if extract_spirit_family(item.name) != base_family:
@@ -1247,6 +1250,8 @@ class StockRepository:
             if flavour not in extract_flavour_keywords(item.name):
                 continue
             if profile and (profile in item.avoid_profiles or (profile not in item.profiles and not item.neutral)):
+                continue
+            if item.dessert_only and profile != "dessert":
                 continue
             results.append(item)
         return results
@@ -1311,6 +1316,7 @@ FLAVOUR_KEYWORDS: Set[str] = {
     "peach",
     "cherry",
     "orange",
+    "lemon",
 }
 
 BASE_SPIRIT_FAMILIES = ["vodka", "gin", "rum", "tequila"]

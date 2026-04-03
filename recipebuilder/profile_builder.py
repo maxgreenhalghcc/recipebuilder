@@ -102,7 +102,7 @@ FAMILY_BANS: Dict[str, Tuple[str, ...]] = {
     "DARK_SPICED_WOODY": (
         "malibu", "coconut syrup", "coconut rum", "passionfruit syrup", "passion fruit syrup",
         "pineapple syrup", "bubblegum", "melon", "midori", "banana", "lychee",
-        "watermelon", "blue curacao", "marshmallow", "candy",
+        "watermelon", "blue curacao", "marshmallow", "candy", "tiki rum",
     ),
     "FRESH_CITRUS_ZESTY": (
         "bubblegum", "marshmallow", "caramel syrup", "toffee", "vanilla syrup",
@@ -127,6 +127,12 @@ FAMILY_BANS: Dict[str, Tuple[str, ...]] = {
         # Permissive family for party vibes
         "vermouth", "amaro",
     ),
+}
+
+# Hard clash bans: spirit family → sweetener/modifier name fragments that must never appear together
+SPIRIT_SWEETENER_CLASHES: Dict[str, Tuple[str, ...]] = {
+    "gin": ("vanilla", "biscoff", "gingerbread", "toffee", "caramel", "butterscotch"),
+    "tequila": ("vanilla", "biscoff", "gingerbread", "toffee", "caramel", "butterscotch"),
 }
 
 # Preferred ingredients for each family (used for scoring, not hard gating)
@@ -254,6 +260,10 @@ def determine_flavor_family(responses: Dict[str, Any]) -> FlavorFamily:
     if "beach" in house:
         scores["CANDY_FUN"] += 0.5
 
+    # Refreshing/vibrant dining style should pull away from dessert direction
+    if "refreshing" in dining or "vibrant" in dining:
+        scores["DESSERT_INDULGENT"] -= 2.5
+
     # Find the winning family
     best_family = max(scores.items(), key=lambda x: x[1])
 
@@ -293,11 +303,11 @@ PROFILES = [
 ]
 
 PROFILE_FLAVOUR_WORDS: Dict[str, List[str]] = {
-    "tropical": ["passion", "pineapple", "mango", "coconut", "orange"],
+    "tropical": ["passion", "pineapple", "mango", "coconut", "orange", "peach"],
     "citrus_fresh": ["lemon", "lime", "orange", "grapefruit"],
     "berry": ["raspberry", "strawberry", "berry", "cranberry"],
     "classic_boozy": ["orange", "grapefruit"],
-    "candy_fun": ["blue", "raspberry", "strawberry", "cherry", "berry"],
+    "candy_fun": ["blue", "raspberry", "strawberry", "cherry", "berry", "peach", "lemon"],
     "dessert": ["vanilla", "caramel", "toffee", "passion", "pineapple"],
 }
 
@@ -740,14 +750,24 @@ class ProfileRecipeBuilder:
 
         juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=spec["max_juices"])
 
+        sweetener_pool = profile_items("sweetener")
+        # Prevent dessert spirit + dessert sweetener stacking (e.g. Toffee Vodka + Vanilla Syrup)
+        if getattr(base, "dessert_only", False):
+            _dessert_sweet_ban = ("vanilla", "biscoff", "toffee", "caramel", "gingerbread", "butterscotch")
+            sweetener_pool = [s for s in sweetener_pool if not any(k in s.name.lower() for k in _dessert_sweet_ban)]
+
+        # If the selected base is itself a flavoured spirit, don't add a second one
+        base_is_flavoured = bool(extract_flavour_keywords(base.name))
+
         sweetener, sweet_ml, flavoured_spirit, flavoured_ml = self._choose_sweet_components(
             profile,
             base_family,
-            profile_items("sweetener"),
+            sweetener_pool,
             profile_items("base"),
             abv_lane,
             rnd,
             aroma_preference=responses.get("aroma_preference") or "",
+            skip_flavoured_spirit=base_is_flavoured,
         )
 
         # Modifier keyword adjustments (floral prefer elderflower etc.)
@@ -772,8 +792,14 @@ class ProfileRecipeBuilder:
 
         modifier = self._choose_modifier(profile_items("modifier"), modifier_keywords)
 
+        # Reduce clutter: flavoured spirit + sweetener already provide enough complexity
+        if flavoured_spirit is not None and sweetener is not None:
+            modifier = None
+
         available_sours = profile_items("sour") + [j for j in juice_pool if _is_sour(j)]
-        sour = self._maybe_add_sour(profile, available_sours, bool(spec["needs_sour"]))
+        # Dessert profile drinks are rich and sweet — sour doesn't belong
+        needs_sour = bool(spec["needs_sour"]) and profile != "dessert"
+        sour = self._maybe_add_sour(profile, available_sours, needs_sour)
 
         sour_ml = 0.0 if sour is None else prefs["sour_ml"]
         modifier_ml = 0.0 if modifier is None else 15.0
@@ -847,12 +873,15 @@ class ProfileRecipeBuilder:
 
         if spec["needs_mixer"]:
             # Only attempt a top-up when template requires it
+            # Max sensible top-up: a bartender pours ~100-150ml, not the full remaining glass
+            _TOP_CAP = 150.0
+
             if glass.sparkling:
                 mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
                 space = max(0.0, glass.capacity_ml - core_volume)
                 target_min = 80.0 if carbonation.startswith("properly") else 40.0
                 if mixer_item:
-                    mixer_ml = max(target_min, space)
+                    mixer_ml = min(max(target_min, space), _TOP_CAP)
 
             elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
                 mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
@@ -864,14 +893,14 @@ class ProfileRecipeBuilder:
                 mixer_item = self._select_mixer(fallback_mixers, mixer_keywords, carbonation)
                 if mixer_item:
                     space = max(0.0, glass.capacity_ml - core_volume)
-                    mixer_ml = max(80.0, space)
+                    mixer_ml = min(max(80.0, space), _TOP_CAP)
 
             if mixer_item is None and glass.sparkling and not carbonation.startswith("properly"):
                 # last fallback: use extra juice as a "lengthener"
                 fallback = _pick_first_matching(profile_items("juice"), prefs["juice_keywords"]) if juices else None
                 if fallback:
                     mixer_item = fallback
-                    mixer_ml = max(25.0, glass.capacity_ml - core_volume)
+                    mixer_ml = min(max(25.0, glass.capacity_ml - core_volume), _TOP_CAP)
         else:
             # Template says NO TOP (SOUR/MARTINI_UP/OLD_FASHIONED/TIKI_SHAKEN)
             mixer_item = None
@@ -1096,12 +1125,21 @@ class ProfileRecipeBuilder:
                         score += 3.0  # Good alternative
                     elif subtype == "light":
                         score += 0.5
+                    # Tiki rum is a party spirit, wrong for woody/classic briefs
+                    if "tiki" in item.name.lower():
+                        score -= 6.0
                 else:
                     # For tropical/summer profiles
                     if subtype in {"spiced", "dark", "anejo"}:
                         score += 2.0 if profile in {"tropical", "dessert", "candy_fun"} else 1.0
                     if subtype in {"light"}:
                         score += 2.0 if profile in {"citrus_fresh", "berry"} else 0.5
+                    # Tiki rum is wrong for winter/haunted even in tropical lanes
+                    if "tiki" in item.name.lower():
+                        _season = (responses.get("season") or "").lower()
+                        _house = (responses.get("house_type") or "").lower()
+                        if _season in ("winter", "autumn") or "haunted" in _house:
+                            score -= 5.0
             return score
 
         if desired:
@@ -1112,9 +1150,20 @@ class ProfileRecipeBuilder:
                 item
                 for item in getattr(self.repository, "_all_items", [])
                 if item.role == "base" and desired in item.name.lower() and not is_creamy(item)
+                and profile not in item.avoid_profiles
             ]
             if fallback_pool:
                 return max(fallback_pool, key=subtype_score)
+
+            # Last resort: guest specified a spirit family — always honour it even if no
+            # perfect profile match exists. Better a slightly off-profile rum than a tequila.
+            last_resort = [
+                item
+                for item in getattr(self.repository, "_all_items", [])
+                if item.role == "base" and desired in item.name.lower() and not is_creamy(item)
+            ]
+            if last_resort:
+                return max(last_resort, key=subtype_score)
 
         ranked = sorted(items, key=subtype_score, reverse=True)
         preferred = _pick_first_matching(ranked, keywords)
@@ -1159,8 +1208,14 @@ class ProfileRecipeBuilder:
         abv_lane: str,
         rnd: random.Random,
         aroma_preference: str = "",
+        skip_flavoured_spirit: bool = False,
     ) -> Tuple[Optional[StockItem], float, Optional[StockItem], float]:
         sweeteners = [s for s in sweeteners if not is_creamy(s)]
+
+        # Hard clash bans: filter sweeteners that don't pair with this base spirit
+        clashes = SPIRIT_SWEETENER_CLASHES.get(base_family, ())
+        if clashes:
+            sweeteners = [s for s in sweeteners if not any(c in s.name.lower() for c in clashes)]
         flavour_words = PROFILE_FLAVOUR_WORDS.get(profile, [])
         matching_syrups = [s for s in sweeteners if any(word in s.name.lower() for word in flavour_words)]
         neutral_syrups = [s for s in sweeteners if s not in matching_syrups]
@@ -1173,7 +1228,7 @@ class ProfileRecipeBuilder:
                 neutral_syrups = [s for s in neutral_syrups if s not in elderflower_syrups]
 
         flavoured_spirits: List[StockItem] = []
-        if base_family:
+        if base_family and not skip_flavoured_spirit:
             for word in flavour_words:
                 flavoured_spirits.extend(self.repository.find_flavoured_spirits(base_family, word, profile))
 
@@ -1582,6 +1637,17 @@ class ProfileRecipeBuilder:
             priority = ["orange", "rosemary", "cherry"] + [p for p in priority if p not in ["orange", "rosemary", "cherry"]]
         if "floral" in aroma:
             priority = ["mint", "lemon", "edible flower"] + [p for p in priority if p not in ["mint", "lemon"]]
+
+        # Hard garnish bans by lane/season/house/spirit
+        house_type = (responses.get("house_type") or "").strip().lower()
+        season = (responses.get("season") or "").strip().lower()
+        garnish_bans: set = set()
+        if "woody" in aroma or season in ("autumn", "winter") or "haunted" in house_type:
+            garnish_bans.add("mint")
+        if base_spirit == "tequila":
+            garnish_bans.add("mint")  # tequila garnish should be citrus, not mint
+        if garnish_bans:
+            gchoices = [g for g in gchoices if not any(b in g.name.lower() for b in garnish_bans)]
 
         # Try to find a matching garnish from available pool
         if gchoices:
