@@ -103,21 +103,26 @@ FAMILY_BANS: Dict[str, Tuple[str, ...]] = {
         "malibu", "coconut syrup", "coconut rum", "passionfruit syrup", "passion fruit syrup",
         "pineapple syrup", "bubblegum", "melon", "midori", "banana", "lychee",
         "watermelon", "blue curacao", "marshmallow", "candy", "tiki rum",
+        "grenadine",  # cheap sweetener — wrong for woody/haunted
     ),
     "FRESH_CITRUS_ZESTY": (
         "bubblegum", "marshmallow", "caramel syrup", "toffee", "vanilla syrup",
         "coconut syrup", "banana", "melon", "midori", "candy",
+        "biscoff", "gingerbread",  # dessert/biscuit clashes with fresh/zesty
     ),
     "TROPICAL_BRIGHT": (
         # Permissive family - minimal bans
         "maple syrup", "gingerbread",
+        "biscoff",  # dessert biscuit doesn't belong in tropical
     ),
     "BERRY_FRUITY": (
         "coconut", "banana", "melon", "midori", "bubblegum", "caramel",
+        "biscoff", "gingerbread",  # biscuit/dessert incompatible with fresh berry
     ),
     "FLORAL_ELEGANT": (
         "bubblegum", "banana", "coconut syrup", "melon", "midori",
         "marshmallow", "caramel", "candy", "watermelon", "peach schnapps",
+        "biscoff", "gingerbread", "toffee",  # heavy dessert clashes with floral
     ),
     "DESSERT_INDULGENT": (
         # Permissive - just avoid raw tart clashes
@@ -748,7 +753,9 @@ class ProfileRecipeBuilder:
         if base_spirit == "gin" and profile == "citrus_fresh" and ("citrus" in aroma or "zesty" in sweet_style):
             core_juices = [j for j in core_juices if "pineapple" not in j.name.lower()]
 
-        juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=spec["max_juices"])
+        # Dark/woody lane: max 1 juice body to avoid crowding
+        _juice_limit = 1 if flavor_family == "DARK_SPICED_WOODY" else spec["max_juices"]
+        juices = self._choose_juices(core_juices, prefs["juice_keywords"], prefs.get("juice_priority"), rnd, limit=_juice_limit)
 
         sweetener_pool = profile_items("sweetener")
         # Prevent dessert spirit + dessert sweetener stacking (e.g. Toffee Vodka + Vanilla Syrup)
@@ -865,6 +872,14 @@ class ProfileRecipeBuilder:
         else:
             mixer_keywords = [k for k in mixer_keywords if "tonic" not in k.lower()]
 
+        def _mixer_pool_for_bitterness() -> List[StockItem]:
+            """Return mixer pool with tonic removed unless bitterness is high."""
+            pool = profile_items("mixer")
+            if bitterness != "high":
+                pool = [m for m in pool if "tonic" not in m.name.lower()]
+                # Also strip from neutral fallback pool
+            return pool
+
         # ----------------------------
         # TEMPLATE-DRIVEN MIXER LOGIC
         # ----------------------------
@@ -877,19 +892,20 @@ class ProfileRecipeBuilder:
             _TOP_CAP = 150.0
 
             if glass.sparkling:
-                mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
+                mixer_item = self._select_mixer(_mixer_pool_for_bitterness(), mixer_keywords, carbonation)
                 space = max(0.0, glass.capacity_ml - core_volume)
                 target_min = 80.0 if carbonation.startswith("properly") else 40.0
                 if mixer_item:
                     mixer_ml = min(max(target_min, space), _TOP_CAP)
 
             elif glass.capacity_ml - core_volume > 40 and carbonation.startswith("lightly"):
-                mixer_item = self._select_mixer(profile_items("mixer"), mixer_keywords, carbonation)
+                mixer_item = self._select_mixer(_mixer_pool_for_bitterness(), mixer_keywords, carbonation)
                 if mixer_item:
                     mixer_ml = max(25.0, min(60.0, glass.capacity_ml - core_volume))
 
             if carbonation.startswith("properly") and (mixer_item is None or not _is_mixer(mixer_item)):
-                fallback_mixers = self.repository.neutral_items(role="mixer") + profile_items("mixer")
+                fallback_mixers = [m for m in self.repository.neutral_items(role="mixer") + profile_items("mixer")
+                                   if bitterness == "high" or "tonic" not in m.name.lower()]
                 mixer_item = self._select_mixer(fallback_mixers, mixer_keywords, carbonation)
                 if mixer_item:
                     space = max(0.0, glass.capacity_ml - core_volume)
@@ -2121,7 +2137,11 @@ class ProfileRecipeBuilder:
             # If fizzy requested, try inject mixer (but NEVER fail if none)
             if (carbonation.startswith("light") or carbonation.startswith("proper")) and not any(s.role == "mixer" for s in suggestions):
                 pool = self._get_family_filtered_items(profile, "mixer")
-                m = _pick_first_matching(pool, ["soda", "lemonade", "ginger", "tonic", "sparkling"])
+                # Only allow tonic as fallback for high bitterness
+                _guardrail_bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
+                if _guardrail_bitterness != "high":
+                    pool = [m for m in pool if "tonic" not in m.name.lower()]
+                m = _pick_first_matching(pool, ["soda", "lemonade", "ginger", "sparkling"] + (["tonic"] if _guardrail_bitterness == "high" else []))
                 if m:
                     suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 75.0, "mixer"))
                     all_fixes.append("INJECTED_MIXER_FOR_CARBONATION")
