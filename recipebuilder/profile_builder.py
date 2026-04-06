@@ -1837,9 +1837,15 @@ class ProfileRecipeBuilder:
     
         if wants_fizzy and allows_mixer and not has_mixer:
             pool = self._get_family_filtered_items(profile, "mixer")
+            _step4_bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
+            if _step4_bitterness != "high":
+                pool = [m for m in pool if "tonic" not in m.name.lower()]
             # properly fizzy: prefer soda/tonic/ginger; lightly: soda/lemonade
             if carbonation.startswith("proper"):
-                m = _pick_first_matching(pool, ["soda", "tonic", "ginger", "lemonade", "sparkling"])
+                _proper_kw = ["soda", "ginger", "lemonade", "sparkling"]
+                if _step4_bitterness == "high":
+                    _proper_kw = ["soda", "tonic", "ginger", "lemonade", "sparkling"]
+                m = _pick_first_matching(pool, _proper_kw)
             else:
                 m = _pick_first_matching(pool, ["soda", "lemonade", "ginger"])
             if m:
@@ -2018,7 +2024,12 @@ class ProfileRecipeBuilder:
         # HARD RULE: carbonation must show (if fizzy, ensure a mixer exists) — AFTER stripping
         if (carbonation.startswith("light") or carbonation.startswith("proper")) and not any(s.role == "mixer" for s in suggestions):
             pool = self._get_family_filtered_items(profile, "mixer")
-            m = _pick_first_matching(pool, ["soda", "lemonade", "ginger", "tonic", "sparkling"])
+            if bitterness != "high":
+                pool = [m for m in pool if "tonic" not in m.name.lower()]
+            _hard_rule_kw = ["soda", "lemonade", "ginger", "sparkling"]
+            if bitterness == "high":
+                _hard_rule_kw = ["soda", "lemonade", "ginger", "tonic", "sparkling"]
+            m = _pick_first_matching(pool, _hard_rule_kw)
             if m:
                 suggestions.append(IngredientSuggestion(m, m.default_measure_ml or 75.0, "mixer"))
                 fixes.append("INJECTED_MIXER_FOR_CARBONATION")
