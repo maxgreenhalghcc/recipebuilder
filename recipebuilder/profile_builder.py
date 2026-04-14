@@ -1989,8 +1989,9 @@ class ProfileRecipeBuilder:
     
         carbonation = (responses.get("carbonation_texture") or "").strip().lower()
         aroma = (responses.get("aroma_preference") or "").strip().lower()
+        bitterness = (responses.get("bitterness_tolerance") or "").strip().lower()
         is_martini = self._is_martini_style_glass(glass.name)
-    
+
         # -----------------------------
         # TEMPLATE ENFORCEMENT (template-first)
         # -----------------------------
