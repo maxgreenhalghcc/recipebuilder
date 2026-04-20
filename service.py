@@ -528,6 +528,58 @@ def _collect_warnings(recipe) -> list[str]:
     return warnings
 
 
+def _truthy(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    s = str(value).strip().lower()
+    return s in {"1", "true", "yes", "y", "on"}
+
+
+def _enforce_method_contract(ingredients: list[str], method: str, responses: dict[str, Any]) -> str:
+    """Deterministic post-processing for method text.
+
+    This prevents common 'contract misses' that hurt staff trust:
+    - foam requested but no shaking steps
+    - mixer/top-up ingredient present but method doesn't mention topping
+    """
+
+    method_lower = (method or "").lower()
+    lines = method.splitlines() if method else []
+
+    # Foam contract.
+    foam_value = (
+        responses.get("foam_toggle")
+        or responses.get("foam")
+        or responses.get("foamToggle")
+        or responses.get("foam_toggle_preference")
+    )
+    if _truthy(foam_value) and "shake" not in method_lower:
+        # Prepend a clean, bartender-standard foam method.
+        prefix = [
+            "1. Dry shake (no ice) for ~10 seconds to build foam.",
+            "2. Add ice and shake hard.",
+        ]
+        # Renumber existing steps if they already start with digits.
+        if lines:
+            # If the existing method already has numbered steps, just append after ours.
+            lines = prefix + [f"{idx+3}. {line.split('. ',1)[-1]}" if line[:2].isdigit() else f"{idx+3}. {line}" for idx, line in enumerate(lines)]
+        else:
+            lines = prefix
+
+    # Top-with contract.
+    top_with_lines = [s for s in ingredients if isinstance(s, str) and s.lower().startswith("top with ")]
+    if top_with_lines and "top" not in method_lower:
+        # Add a final instruction that matches the ingredient list.
+        for top_line in top_with_lines[:2]:
+            # "Top with Soda Water (mixer)" -> "Top with Soda Water"
+            short = top_line.split("(", 1)[0].strip()
+            lines.append(f"{len(lines)+1}. {short}.")
+
+    return "\n".join(lines).strip() if lines else (method or "").strip()
+
+
 def _extract_bar_and_session(payload: Dict[str, object]) -> tuple[str, Optional[str]]:
     """Determine the bar ID and session ID from the request payload."""
 
@@ -661,6 +713,9 @@ def generate_bespoke_cocktail():  # pragma: no cover - invoked via HTTP
         max_iterations=4,
         target_score=8.0,
     )[:4]
+
+    # Final contract enforcement (deterministic): ensure method reflects foam + top-up instructions.
+    method_text = _enforce_method_contract(ingredients_list, method_text, responses_with_bar)
 
     signature_recipe = {
         "body": {
